@@ -1,0 +1,30 @@
+See http://sv-wiki-01/wiki/index.php/Merging_Android_Kernel_with_G2
+
+These scripts are useful:
+
+apply.sh
+  Apply all of the patches in a remote directory to "here":
+  apply.sh /a/b/d/patches
+
+merge.pl
+  Merge kernel config options into a larger .config file for the
+  kernel.  Was used to merge in the "required" android config into
+  the default g2 .config.  See Documentation/android.txt for required
+  and optional kernel config.
+
+cvscmds.pl
+  Compare two trees and create a list of cvs add and remove commands 
+  that would be need to take one tree (the parent) and turn it into the 
+  other tree.  Generates a file used by patch.pl below.
+  cvscmds.pl new-tree old-tree > patch-in
+
+patch.pl
+  Used to read in command file from cvscmds.pl above and execute the
+  cvs commands.  Run it at the top of the tree in CVS you want to 
+  modify.
+
+break.pl
+  Takes one big patch file and breaks it into individual patch files
+  grouped by using the first directory name after the base dir to
+  create filenames.  Used to break the big android.patch into smaller
+  patches, so categories can be left off.

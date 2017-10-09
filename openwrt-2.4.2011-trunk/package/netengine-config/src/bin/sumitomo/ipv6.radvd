@@ -1,0 +1,45 @@
+config interface
+    option interface    'lan'
+    option AdvSendAdvert    1
+    option AdvManagedFlag    0
+    option AdvOtherConfigFlag 0
+    option MinRtrAdvInterval 100
+    option MaxRtrAdvInterval 300
+    option ignore        0
+
+config prefix
+    option interface    'lan'
+    # If not specified, a non-link-local prefix of the interface is used
+    option prefix        '3000::/64'
+    option AdvOnLink    1
+    option AdvAutonomous    1
+    option AdvRouterAddr    1
+    option AdvValidLifetime 300
+    option AdvPreferredLifetime 300
+    option ignore        0
+
+config interface
+        option interface 'wan'
+        option AdvSendAdvert 1
+        option AdvManagedFlag 0
+        option AdvOtherConfigFlag 0
+        option MinRtrAdvInterval 100
+        option MaxRtrAdvInterval 300
+        option ignore 0
+
+config prefix
+        option interface 'wan'
+        option prefix '5000::/64'
+        option AdvOnLink 1
+        option AdvAutonomous 1
+        option AdvRouterAddr 1
+        option AdvValidLifetime 300
+        option AdvPreferredLifetime 300
+        option ignore 0
+
+config rdnss
+    option interface    'lan'
+    # If not specified, the link-local address of the interface is used
+    option addr        '5000:51a:cafe::2 3001:51a:cafe::3'
+    option ignore        0
+

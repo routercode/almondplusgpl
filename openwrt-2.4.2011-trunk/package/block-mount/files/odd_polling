@@ -1,0 +1,56 @@
+#!/bin/sh
+
+[ $# -ge 1 ] || exit
+
+dev=/dev/$1
+if_type=$2
+
+sysctl  -w dev.cdrom.lock=0
+
+cdrom_old_status=""
+
+
+
+get_mount_point() {
+
+        if [ -f /usr/sbin/blkid ]; then
+                label=`/usr/sbin/blkid $1 -s LABEL | sed -e 's/.*LABEL="//' -e 's/" *$//'`
+                if [ "$label" != '' ];then
+                        echo "/mnt/$if_type/$label"
+                        return
+                fi
+        fi
+
+        echo "/mnt/$if_type/cdrom$(echo $1 | sed -e 's!/dev/sr!!')"
+}
+
+
+while [ 1 ]; do
+        cdrom_status=$(sr $dev)
+        if [ "$cdrom_old_status" != "$cdrom_status" ]; then
+                if [ $cdrom_status -eq 4 ]; then
+                        [ $(disc $dev) -ne 100 ] && {
+
+                        mount_point="$(get_mount_point "$dev" )"
+                        echo "$mount_point" >> /tmp/bbb
+                        grep -qs "$mount_point" /proc/mounts || {
+                        echo "mount $dev $mount_point;"  >> /tmp/bbb
+                        mkdir -p "$mount_point" ; mount $dev "$mount_point"; }
+
+                }
+                else
+                        mount_point=`awk -v node="$dev" '$1 ~ node {print $2;}' /proc/mounts`
+                        [ "$mount_point" != '' ] &&  {
+                                umount $dev
+                                rm -rf "$( echo -e $mount_point)"
+                                mount_point=$(dirname "$mount_point")
+                                echo "$mount_point" | grep -q -e '/mnt/' && {
+                                        subdir=`find "$mount_point" -type d | wc -l`
+                                        [ "$subdir" -eq 1 ] && rm -rf "$mount_point"
+                                }
+                        }
+                fi
+                cdrom_old_status=$cdrom_status
+        fi
+        sleep 3
+done

@@ -1,0 +1,21 @@
+config interface loopback
+    option ifname    lo
+    option proto    static
+    option ipaddr    127.0.0.1
+    option netmask    255.0.0.0
+
+config interface lan
+    option ifname	eth1
+#    option macaddr  00:50:c2:01:01:02
+    option proto	static
+    option ipaddr	192.168.60.1
+    option netmask	255.255.255.0
+    option ip6addr '3000::1/64'
+
+config interface wan
+    option ifname	eth0
+#    option macaddr  00:50:c2:00:01:02
+    option proto	static
+    option ipaddr	220.168.1.1
+    option netmask	255.255.255.0
+    option ip6addr '5000::1/64'

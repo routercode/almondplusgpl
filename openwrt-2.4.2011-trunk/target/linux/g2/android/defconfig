@@ -1,0 +1,7 @@
+# Non-package opwnwrt .config stuff to add for this board,
+# for all profiles.  
+CONFIG_BUSYBOX_CONFIG_RESIZE=y
+CONFIG_BUSYBOX_CONFIG_GETTY=y
+CONFIG_BUSYBOX_CONFIG_LOGIN=y
+# Android reboot/poweroff/halt work better than bb
+# CONFIG_BUSYBOX_CONFIG_HALT is not set

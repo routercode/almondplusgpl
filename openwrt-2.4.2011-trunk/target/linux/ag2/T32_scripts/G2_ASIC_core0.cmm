@@ -1,0 +1,92 @@
+
+;*********************
+;JTAG DEBUGGER SET UP
+;*********************
+;Open CPU system window
+SYSTEM
+SYSTEM.RESET
+SYSTEM.OPTION ENRESET OFF
+SYSTEM.CPU CortexA9MPCore
+;SYSTEM.CPU CortexA9
+;by default the JTAG clock is set to 10Mhz
+;SYSTEM.JTAGCLOCK
+
+;**********************
+;CORESIGHT SYSTEM SETUP
+;***********************
+;JTAG SCAN CHAIN DIAGNOSIS: If you get IR_Width = 4 (ARM7, ARM9, Cortex) or IR_Width = 5 (ARM11)
+;DIAG 3400
+;Read ROM Table
+;AREA
+;DIAG 3411
+
+;R-T Memory Access
+SYSTEM.MULTICORE MEMORYACCESSPORT 0
+SYSTEM.MULTICORE DEBUGACCESSPORT 1
+
+;Setting Core debug register access
+SYSTEM.MULTICORE COREBASE APB:0x00110000
+
+;Setting PTM
+SYSTEM.MULTICORE ETMBASE APB:0x0011C000
+
+;Setting ETB
+SYSTEM.MULTICORE ETBBASE APB:0x00001000
+
+;Setting TPIU
+SYSTEM.MULTICORE TPIUBASE APB:0x00003000
+
+;Setting Funnel
+SYSTEM.MULTICORE FUNNELBASE APB:0x00004000
+SYSTEM.MULTICORE ETMFUNNELPORT 0
+
+;To activate external trace via TPIU instead into the ETB you need to set, but it is the default if there is an ETM Preprocessor connected
+;Trace.Method Analyzer
+;To activate the ETB
+;Trace.Method ONCHIP
+
+SYSTEM.UP
+
+; Disable ROM Remap
+;d.s 0xf0000010 %l 0x0001fc01
+
+;L2 address filtering start address, for memory swap
+;d.s 0xf5010c00 %l 0x00000001	; L2 controller filter start
+;d.s 0xf5010c04 %l 0x40000000	; L2 controller filter end [1GB]
+
+;d.s 0xf000003c %l 0x00000001	; Power off CPU1 in DDR training stage ?
+
+; Load POST
+d.load.binary J:\Work\G2_0627_ASIC\g2\openwrt-2.4.2011-trunk\build_dir\target-arm-openwrt-linux-uclibcgnueabi\bootstrap\post.bin 0xf6a00000 /verify
+d.load.elf J:\Work\G2_0627_ASIC\g2\openwrt-2.4.2011-trunk\build_dir\target-arm-openwrt-linux-uclibcgnueabi\bootstrap\post.elf /nocode
+
+;Load zImage
+;d.load.binary Y:\Work\G2_0627_ASIC\g2\openwrt-2.4.2011-trunk\build_dir\linux-g2_eng\linux-2.6.36\arch\arm\boot\zImage 0x01600000 /verify
+;d.load.elf Y:\Work\G2_0627_ASIC\g2\openwrt-2.4.2011-trunk\build_dir\linux-g2_eng\linux-2.6.36\vmlinux /nocode
+
+r.s r1 0x33C	; mach-id
+r.s r2 0x00000100	; atag position
+r.s pc 0xf6a00000	; post.bin
+;r.s pc 0x01600000	; zImage
+
+; Init UART
+data.set 0xf0070110 %l 0x000364e3	; Enable UART0,RX,TX,baudrate to 115200. Assume APB_CLK=100M
+data.set 0xf0070118 %l 0x000001b2	; Sample rate
+data.set 0xf0070120 %b 0x4F		; print 'O'
+data.set 0xf0070120 %b 0x4B		; print 'K'
+data.set 0xf0070120 %b 0x21		; print '!'
+data.set 0xf0070120 %b 0x0D		;
+data.set 0xf0070120 %b 0x0A		;
+
+data.set 0xf0070140 %l 0x000364e3	; Enable UART0,RX,TX,baudrate to 115200. Assume APB_CLK=100M
+data.set 0xf0070148 %l 0x000001b2	; Sample rate
+data.set 0xf0070150 %b 0x4F		; print 'O'
+data.set 0xf0070150 %b 0x4B		; print 'K'
+data.set 0xf0070150 %b 0x21		; print '!'
+data.set 0xf0070150 %b 0x0D		;
+data.set 0xf0070150 %b 0x0A		;
+
+
+end
+
+

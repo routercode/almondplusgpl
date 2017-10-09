@@ -1,0 +1,25 @@
+#!/bin/sh /etc/rc.common
+#
+# Any adjustments needed for Cortina env.
+#
+START=20
+
+# This fixes the console timeout that happens
+# in about a minute by default.  This makes it
+# 24 hours.
+#
+fix_timeout() {
+   while [ ! -e /data/data/com.android.providers.settings/databases/settings.db ]; do
+       sleep 10
+   done
+   sleep 60
+   echo "update system set value=86400000 where name='screen_off_timeout';" | sqlite3 /data/data/com.android.providers.settings/databases/settings.db
+}
+
+start() {
+  fix_timeout
+}
+
+stop() {
+  /bin/true
+}

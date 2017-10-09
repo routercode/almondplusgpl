@@ -1,0 +1,21 @@
+diff -Naur uci-12012009.5-old/libuci.c uci-12012009.5-new/libuci.c
+--- uci-12012009.5-old/libuci.c	2010-03-23 07:38:00.000000000 -0700
++++ uci-12012009.5-new/libuci.c	2010-09-11 13:12:13.000000000 -0700
+@@ -208,11 +208,17 @@
+ int uci_commit(struct uci_context *ctx, struct uci_package **package, bool overwrite)
+ {
+ 	struct uci_package *p;
++	struct uci_element *e;
+ 	UCI_HANDLE_ERR(ctx);
+ 	UCI_ASSERT(ctx, package != NULL);
+ 	p = *package;
+ 	UCI_ASSERT(ctx, p != NULL);
+ 	UCI_ASSERT(ctx, p->backend && p->backend->commit);
++	uci_foreach_element(&ctx->hooks, e) {
++		struct uci_hook *h = uci_to_hook(e);
++		if (h->ops->commit)
++			h->ops->commit(h->ops, p);
++	}
+ 	p->backend->commit(ctx, package, overwrite);
+ 	return 0;
+ }

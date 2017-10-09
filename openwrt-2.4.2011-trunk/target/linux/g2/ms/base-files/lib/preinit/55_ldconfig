@@ -1,0 +1,6 @@
+#!/bin/sh
+init_ldconfig() {
+  [ -x /sbin/ldconfig ] && /sbin/ldconfig
+}
+
+boot_hook_add preinit_main init_ldconfig

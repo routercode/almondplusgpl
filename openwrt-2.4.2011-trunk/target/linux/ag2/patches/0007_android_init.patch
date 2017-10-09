@@ -1,0 +1,32 @@
+diff -Naur g2-2.6.36/init/Kconfig merged-2.6.36/init/Kconfig
+--- g2-2.6.36/init/Kconfig	2011-08-09 08:33:08.000000000 -0700
++++ merged-2.6.36/init/Kconfig	2011-08-09 08:49:41.000000000 -0700
+@@ -794,6 +794,12 @@
+ config ANON_INODES
+ 	bool
+ 
++config PANIC_TIMEOUT
++	int "Default panic timeout"
++	default 0
++	help
++	  Set default panic timeout.
++
+ menuconfig EMBEDDED
+ 	bool "Configure standard kernel features (for small systems)"
+ 	help
+@@ -966,6 +972,15 @@
+ 	  option replaces shmem and tmpfs with the much simpler ramfs code,
+ 	  which may be appropriate on small systems without swap.
+ 
++config ASHMEM
++	bool "Enable the Anonymous Shared Memory Subsystem"
++	default n
++	depends on SHMEM || TINY_SHMEM
++	help
++	  The ashmem subsystem is a new shared memory allocator, similar to
++	  POSIX SHM but with different behavior and sporting a simpler
++	  file-based API.
++
+ config AIO
+ 	bool "Enable AIO support" if EMBEDDED
+ 	default y

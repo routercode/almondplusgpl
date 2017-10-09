@@ -1,0 +1,9 @@
+# Non-package opwnwrt .config stuff to add for this board,
+# for all profiles.  
+CONFIG_BUSYBOX_CONFIG_RESIZE=y
+CONFIG_BUSYBOX_CONFIG_GETTY=y
+CONFIG_BUSYBOX_CONFIG_LOGIN=y
+CONFIG_CS_UBOOT_MORE_ARGS="SB_PHY=PSXX consoleblank=0 no_console_suspend=1"
+CONFIG_KERNEL_PCIE_NUM_PORTS=1
+CONFIG_PACKAGE_procps=y
+CONFIG_KERNEL_CS752X_NR_VIRTUAL_ETH1=5

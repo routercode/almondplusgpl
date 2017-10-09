@@ -1,0 +1,124 @@
+diff -Naur linux-2.6.36/arch/arm/Kconfig linux-2.6.36-new/arch/arm/Kconfig
+--- linux-2.6.36/arch/arm/Kconfig	2011-09-04 09:47:11.000000000 -0700
++++ linux-2.6.36-new/arch/arm/Kconfig	2011-09-04 11:05:16.000000000 -0700
+@@ -41,6 +41,10 @@
+ config SYS_SUPPORTS_APM_EMULATION
+ 	bool
+ 
++
++config GENERIC_TIME
++	bool
++
+ config GENERIC_GPIO
+ 	bool
+ 
+@@ -242,6 +246,16 @@
+ 	help
+ 	  This enables support for ARM Ltd RealView boards.
+ 
++config ARCH_GOLDENGATE
++	bool "Cortina-systems Golden-Gate Platform"
++	select GENERIC_TIME
++	select ARM_AMBA
++	select COMMON_CLKDEV
++	select GENERIC_CLOCKEVENTS
++	select ARCH_WANT_OPTIONAL_GPIOLIB
++	help
++		This enables support for Cortina-Systems Golden-Gate platform.
++
+ config ARCH_VERSATILE
+ 	bool "ARM Ltd. Versatile family"
+ 	select ARM_AMBA
+@@ -908,6 +922,8 @@
+ 
+ source "arch/arm/mach-realview/Kconfig"
+ 
++source "arch/arm/mach-goldengate/Kconfig"
++
+ source "arch/arm/mach-sa1100/Kconfig"
+ 
+ source "arch/arm/plat-samsung/Kconfig"
+@@ -1144,7 +1160,7 @@
+ 	bool
+ 
+ config PCI
+-	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX
++	bool "PCI support" if ARCH_INTEGRATOR_AP || ARCH_VERSATILE_PB || ARCH_IXP4XX || ARCH_KS8695 || MACH_ARMCORE || ARCH_CNS3XXX || MACH_CORTINA_G2
+ 	help
+ 	  Find out whether you have a PCI motherboard. PCI is the name of a
+ 	  bus system, i.e. the way the CPU talks to the other stuff inside
+@@ -1184,11 +1200,11 @@
+ 	bool "Symmetric Multi-Processing (EXPERIMENTAL)"
+ 	depends on EXPERIMENTAL && (REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP ||\
+ 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 ||\
+-		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
++		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || MACH_CORTINA_G2)
+ 	depends on GENERIC_CLOCKEVENTS
+ 	select USE_GENERIC_SMP_HELPERS
+ 	select HAVE_ARM_SCU if ARCH_REALVIEW || ARCH_OMAP4 || ARCH_S5PV310 ||\
+-		 ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4
++		 ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_GOLDENGATE
+ 	help
+ 	  This enables support for systems with more than one CPU. If you have
+ 	  a system with only one CPU, like most personal computers, say N. If
+@@ -1258,10 +1274,10 @@
+ 	bool "Use local timer interrupts"
+ 	depends on SMP && (REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || \
+ 		REALVIEW_EB_A9MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+-		ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4)
++		ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || MACH_CORTINA_G2)
+ 	default y
+ 	select HAVE_ARM_TWD if ARCH_REALVIEW || ARCH_OMAP4 || ARCH_S5PV310 || \
+-		ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS
++		ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS || ARCH_GOLDENGATE
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
+diff -Naur linux-2.6.36/arch/arm/Makefile linux-2.6.36-new/arch/arm/Makefile
+--- linux-2.6.36/arch/arm/Makefile	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/arch/arm/Makefile	2011-09-04 11:05:16.000000000 -0700
+@@ -169,6 +169,7 @@
+ machine-$(CONFIG_ARCH_PNX4008)		:= pnx4008
+ machine-$(CONFIG_ARCH_PXA)		:= pxa
+ machine-$(CONFIG_ARCH_REALVIEW)		:= realview
++machine-$(CONFIG_ARCH_GOLDENGATE)   := goldengate
+ machine-$(CONFIG_ARCH_RPC)		:= rpc
+ machine-$(CONFIG_ARCH_S3C2410)		:= s3c2410 s3c2400 s3c2412 s3c2416 s3c2440 s3c2443
+ machine-$(CONFIG_ARCH_S3C24A0)		:= s3c24a0
+diff -Naur linux-2.6.36/arch/arm/kernel/process.c linux-2.6.36-new/arch/arm/kernel/process.c
+--- linux-2.6.36/arch/arm/kernel/process.c	2011-09-04 09:47:11.000000000 -0700
++++ linux-2.6.36-new/arch/arm/kernel/process.c	2011-09-04 11:05:16.000000000 -0700
+@@ -39,6 +39,10 @@
+ #include <asm/stacktrace.h>
+ #include <asm/mach/time.h>
+ 
++#ifdef CONFIG_CACHE_L2X0
++#include <asm/hardware/cache-l2x0.h>
++#endif
++
+ #ifdef CONFIG_CC_STACKPROTECTOR
+ #include <linux/stackprotector.h>
+ unsigned long __stack_chk_guard __read_mostly;
+@@ -110,6 +114,11 @@
+ 	/* Turn off caching */
+ 	cpu_proc_fin();
+ 
++#ifdef CONFIG_CACHE_L2X0
++	/* Disable L2 */
++	writel_relaxed(0, IO_ADDRESS(GOLDENGATE_L220_BASE) + L2X0_CTRL);
++#endif
++
+ 	/* Push out any further dirty data, and ensure cache is empty */
+ 	flush_cache_all();
+ 
+diff -Naur linux-2.6.36/arch/arm/kernel/setup.c linux-2.6.36-new/arch/arm/kernel/setup.c
+--- linux-2.6.36/arch/arm/kernel/setup.c	2011-09-04 09:47:11.000000000 -0700
++++ linux-2.6.36-new/arch/arm/kernel/setup.c	2011-09-04 11:05:16.000000000 -0700
+@@ -46,6 +46,7 @@
+ #include <asm/mach/time.h>
+ #include <asm/traps.h>
+ #include <asm/unwind.h>
++#include <mach/debug_print.h>
+ 
+ #if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
+ #include "compat.h"

@@ -1,0 +1,42 @@
+menu "Mapping drivers for chip access"
+     depends on ARCH_GOLDENGATE
+
+config MTD_CORTINA_CS752X_CFI
+        tristate "CFI Flash device mapped on CORTINA_G2"
+        select MTD_CFI
+        help
+          Map driver for CORTINA_G2 demo board.
+
+config MTD_CORTINA_CS752X_PFLASH_SIZE
+        hex "Parallel flash size on board."
+        depends on MTD_CORTINA_CS752X_CFI
+        default "0x8000000"
+        help
+          Set flash size on board. Default size is 128MB.
+
+config MTD_CORTINA_CS752X_SERIAL_ATMEL
+        tristate "ATMEL Serial Flash device mapped on CORTINA_G2"
+	select MTD
+        select MTD_PARTITIONS
+        help
+          Map driver for CORTINA_G2 demo board.
+
+config MTD_CORTINA_CS752X_SERIAL_SPANSION
+        tristate "SPANSION Serial Flash device mapped on CORTINA_G2"
+	select MTD
+        select MTD_PARTITIONS
+        help
+          Map driver for CORTINA_G2 reference board.
+
+config MTD_CORTINA_CS752X_SERIAL_ST
+        tristate "ST Serial Flash device mapped on CORTINA_G2"
+	select MTD
+        select MTD_PARTITIONS
+        help
+          Map driver for CORTINA_G2 demo board.          
+
+config CORTINA_CS752X_SHARE_PIN
+        tristate "Parallel Flash share pin on CORTINA_G2 ASIC"
+        depends on MACH_CORTINA_G2
+
+endmenu

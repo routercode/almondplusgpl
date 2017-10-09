@@ -1,0 +1,238 @@
+diff -Naur linux-2.6.36/drivers/mtd/mtdcore.c linux-2.6.36-new/drivers/mtd/mtdcore.c
+--- linux-2.6.36/drivers/mtd/mtdcore.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/mtd/mtdcore.c	2011-09-04 11:08:38.000000000 -0700
+@@ -37,6 +37,7 @@
+ #include <linux/gfp.h>
+ 
+ #include <linux/mtd/mtd.h>
++#include <linux/semaphore.h>
+ 
+ #include "mtdcore.h"
+ /*
+@@ -713,10 +714,14 @@
+ 	return ret;
+ }
+ 
++struct semaphore cs752x_flash_sem;
++
+ static int __init init_mtd(void)
+ {
+ 	int ret;
+ 
++	init_MUTEX( &cs752x_flash_sem );
++
+ 	ret = class_register(&mtd_class);
+ 	if (ret)
+ 		goto err_reg;
+@@ -733,6 +738,7 @@
+ 	if (ret)
+ 		goto err_bdi3;
+ 
++
+ #ifdef CONFIG_PROC_FS
+ 	if ((proc_mtd = create_proc_entry( "mtd", 0, NULL )))
+ 		proc_mtd->read_proc = mtd_read_proc;
+diff -Naur linux-2.6.36/drivers/mtd/tests/Makefile linux-2.6.36-new/drivers/mtd/tests/Makefile
+--- linux-2.6.36/drivers/mtd/tests/Makefile	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/mtd/tests/Makefile	2011-09-04 11:08:39.000000000 -0700
+@@ -6,3 +6,5 @@
+ obj-$(CONFIG_MTD_TESTS) += mtd_subpagetest.o
+ obj-$(CONFIG_MTD_TESTS) += mtd_torturetest.o
+ obj-$(CONFIG_MTD_TESTS) += mtd_nandecctest.o
++obj-$(CONFIG_MTD_TESTS) += mtd_ecctest.o
++obj-$(CONFIG_MTD_TESTS) += mtd_bchtest.o
+diff -Naur linux-2.6.36/drivers/mtd/tests/mtd_oobtest.c linux-2.6.36-new/drivers/mtd/tests/mtd_oobtest.c
+--- linux-2.6.36/drivers/mtd/tests/mtd_oobtest.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/mtd/tests/mtd_oobtest.c	2011-09-04 11:08:39.000000000 -0700
+@@ -410,6 +410,7 @@
+ 	use_offset = 0;
+ 	use_len = mtd->ecclayout->oobavail;
+ 	use_len_max = mtd->ecclayout->oobavail;
++	wmb();
+ 	vary_offset = 0;
+ 
+ 	/* First test: write all OOB, read it back and verify */
+diff -Naur linux-2.6.36/drivers/mtd/tests/mtd_stresstest.c linux-2.6.36-new/drivers/mtd/tests/mtd_stresstest.c
+--- linux-2.6.36/drivers/mtd/tests/mtd_stresstest.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/mtd/tests/mtd_stresstest.c	2011-09-04 11:08:39.000000000 -0700
+@@ -24,9 +24,10 @@
+ #include <linux/moduleparam.h>
+ #include <linux/err.h>
+ #include <linux/mtd/mtd.h>
+-#include <linux/slab.h>
+ #include <linux/sched.h>
+ #include <linux/vmalloc.h>
++#include <linux/slab.h>
++
+ 
+ #define PRINT_PREF KERN_INFO "mtd_stresstest: "
+ 
+@@ -212,31 +213,37 @@
+ static int do_operation(void)
+ {
+ 	if (simple_rand() & 1)
++	{
++	       printk(PRINT_PREF "--->do_read\n");
+ 		return do_read();
++        }
+ 	else
++	{
++	        printk(PRINT_PREF "-->do_write\n");
+ 		return do_write();
++	}
+ }
+ 
+ static int scan_for_bad_eraseblocks(void)
+ {
+ 	int i, bad = 0;
+ 
+-	bbt = kzalloc(ebcnt, GFP_KERNEL);
++	bbt = kmalloc(ebcnt, GFP_KERNEL);
+ 	if (!bbt) {
+ 		printk(PRINT_PREF "error: cannot allocate memory\n");
+ 		return -ENOMEM;
+ 	}
+-
+-	/* NOR flash does not implement block_isbad */
+-	if (mtd->block_isbad == NULL)
+-		return 0;
++	memset(bbt, 0 , ebcnt);
+ 
+ 	printk(PRINT_PREF "scanning for bad eraseblocks\n");
+-	for (i = 0; i < ebcnt; ++i) {
+-		bbt[i] = is_block_bad(i) ? 1 : 0;
+-		if (bbt[i])
+-			bad += 1;
+-		cond_resched();
++	if(mtd->type==MTD_NANDFLASH)
++	{
++		for (i = 0; i < ebcnt; ++i) {
++			bbt[i] = is_block_bad(i) ? 1 : 0;
++			if (bbt[i])
++				bad += 1;
++			cond_resched();
++		}
+ 	}
+ 	printk(PRINT_PREF "scanned %d eraseblocks, %d are bad\n", i, bad);
+ 	return 0;
+@@ -269,7 +276,7 @@
+ 	tmp = mtd->size;
+ 	do_div(tmp, mtd->erasesize);
+ 	ebcnt = tmp;
+-	pgcnt = mtd->erasesize / pgsize;
++	pgcnt = mtd->erasesize / pgsize; //mtd->writesize;
+ 
+ 	printk(PRINT_PREF "MTD device size %llu, eraseblock size %u, "
+ 	       "page size %u, count of eraseblocks %u, pages per "
+@@ -278,16 +285,23 @@
+ 	       pgsize, ebcnt, pgcnt, mtd->oobsize);
+ 
+ 	/* Read or write up 2 eraseblocks at a time */
++	printk(PRINT_PREF "Read or write up 2 eraseblocks at a time\n");
+ 	bufsize = mtd->erasesize * 2;
+ 
+ 	err = -ENOMEM;
++/*
+ 	readbuf = vmalloc(bufsize);
+ 	writebuf = vmalloc(bufsize);
++*/
++	readbuf = kmalloc(bufsize, GFP_KERNEL);
++	writebuf = kmalloc(bufsize, GFP_KERNEL);
++
+ 	offsets = kmalloc(ebcnt * sizeof(int), GFP_KERNEL);
+ 	if (!readbuf || !writebuf || !offsets) {
+ 		printk(PRINT_PREF "error: cannot allocate memory\n");
+ 		goto out;
+ 	}
++
+ 	for (i = 0; i < ebcnt; i++)
+ 		offsets[i] = mtd->erasesize;
+ 	simple_srand(current->pid);
+@@ -300,7 +314,7 @@
+ 
+ 	/* Do operations */
+ 	printk(PRINT_PREF "doing operations\n");
+-	for (op = 0; op < count; op++) {
++	for (op = 1; op < count; op++) {
+ 		if ((op & 1023) == 0)
+ 			printk(PRINT_PREF "%d operations done\n", op);
+ 		err = do_operation();
+@@ -313,8 +327,8 @@
+ out:
+ 	kfree(offsets);
+ 	kfree(bbt);
+-	vfree(writebuf);
+-	vfree(readbuf);
++	kfree(writebuf);
++	kfree(readbuf);
+ 	put_mtd_device(mtd);
+ 	if (err)
+ 		printk(PRINT_PREF "error %d occurred\n", err);
+diff -Naur linux-2.6.36/drivers/mtd/tests/mtd_torturetest.c linux-2.6.36-new/drivers/mtd/tests/mtd_torturetest.c
+--- linux-2.6.36/drivers/mtd/tests/mtd_torturetest.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/mtd/tests/mtd_torturetest.c	2011-09-04 11:08:38.000000000 -0700
+@@ -28,8 +28,8 @@
+ #include <linux/moduleparam.h>
+ #include <linux/err.h>
+ #include <linux/mtd/mtd.h>
+-#include <linux/slab.h>
+ #include <linux/sched.h>
++#include <linux/slab.h>
+ 
+ #define PRINT_PREF KERN_INFO "mtd_torturetest: "
+ #define RETRIES 3
+@@ -305,7 +305,7 @@
+ 	while (1) {
+ 		int i;
+ 		void *patt;
+-
++                printk(PRINT_PREF "			Erase blocks.\n");
+ 		/* Erase all eraseblocks */
+ 		for (i = eb; i < eb + ebcnt; i++) {
+ 			if (bad_ebs[i - eb])
+@@ -315,7 +315,7 @@
+ 				goto out;
+ 			cond_resched();
+ 		}
+-
++                printk(PRINT_PREF "			Check bad !!.\n");
+ 		/* Check if the eraseblocks contain only 0xFF bytes */
+ 		if (check) {
+ 			for (i = eb; i < eb + ebcnt; i++) {
+@@ -330,7 +330,7 @@
+ 				cond_resched();
+ 			}
+ 		}
+-
++                printk(PRINT_PREF "			Write the pattern !!.\n");
+ 		/* Write the pattern */
+ 		for (i = eb; i < eb + ebcnt; i++) {
+ 			if (bad_ebs[i - eb])
+@@ -344,7 +344,7 @@
+ 				goto out;
+ 			cond_resched();
+ 		}
+-
++                printk(PRINT_PREF "			Verify what we wrote !!.\n");
+ 		/* Verify what we wrote */
+ 		if (check) {
+ 			for (i = eb; i < eb + ebcnt; i++) {
+@@ -365,7 +365,7 @@
+ 				cond_resched();
+ 			}
+ 		}
+-
++                printk(PRINT_PREF "Verify what we wrote done(erase_cycles:%d) !!.\n",erase_cycles);
+ 		erase_cycles += 1;
+ 
+ 		if (erase_cycles % gran == 0) {
+@@ -470,7 +470,8 @@
+ 	char *diff;
+ 
+ 	printk("Offset       Read                          Written\n");
+-	while (i < len) {
++	//while (i < len) {
++	while (i < 8) {
+ 		printk("0x%08x: ", start + i);
+ 		diff = "   ";
+ 		for (j1 = 0; j1 < 8 && i + j1 < len; j1++) {

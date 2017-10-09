@@ -1,0 +1,57 @@
+Cortina Packet Description File
+// The keyword "Cortina Packet Description File" must be present at row 1, column 1
+// version: 0.0.1
+
+
+// 0 -------------------------------------------------------------------------
+Begin Packet: 
+	PacketType:		L5	
+	PacketLength:    	168
+	PacketNumber:		1
+	L2: 			Ethernet-II
+		DA:		ff:ff:ff:ff:ff:ff
+		SA:		00:11:22:33:44:00
+		EtherType:	0x800
+	L2: end 
+	L3: 			IPV4
+		SIP:		192.168.2.1
+		DIP:		123.0.0.107
+		ID		4567
+		TOS		127
+		TTL		4
+		protocol	17		// TCP
+		chksum		1		// 1: do check sum, 0: no chksum
+	L3: end 
+	L4:  			UDP
+		Sport:		319		// random
+		Dport:		319
+		chksum		1		// 1: do check sum, 0: no chksum
+	L4: end 
+	L5:				IEEE-1588	//If L5 Enable,must disable Signature.
+		versionPTP:			1
+		versionNetwork:		2
+		subdomain:			// Two method : No Keyin or 95:68:70:76:84:0:0:0:0:0:0:0:0:0:0:0 (16 BYTES)
+		messageType:		0x1
+		sourceCT:			1
+		sourceUuid:			6:5:4:3:2:1
+		sourcePortId		0
+		sequenceId:			8	
+		control:			0x01
+		flags:				0:0xc
+	L5: end
+	PAYLOAD:		Sequential
+		Start:		0
+		Step:		1
+//	Signature:	begin		
+//		SRC_PID:	0     //source port id 0,1,2,3,4
+//		DEST_PID:	0xf     //destination port id, unicast: 0,1,2,3,4
+//		                  //     broadcat : 0xf
+//		                  //     multicast : 0xE, look for md_pid for multicast destination port id
+//		QID:		0     // Queue id : 0,1,2,3 
+//		MD_PID :	0x4     //If DEST_PID = 0xE, see the value for destination
+		                  // for example id this valueis = 0b0000_0111, then port 0,1,2 will receive the packet
+//	Signature : end	
+	PAYLOAD end
+End packet
+
+

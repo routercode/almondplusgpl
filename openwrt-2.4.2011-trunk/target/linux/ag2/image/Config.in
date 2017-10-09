@@ -1,0 +1,108 @@
+config ADDITIONAL_HOST_TOOLS
+       string "Additional host tools needed"
+       default ""
+       help
+         Additional tools in ./tools/ that need to be compiled
+	 on the build host to build this target.
+
+config GB_FLASH_CONSTRUCTION
+       bool "Build Flash Images"
+       depends !TARGET_ROOTFS_INITRAMFS && TARGET_ag2
+       default n
+       help
+         Build flash.bin and various software download images
+	 to support the G2 platform and system upgrade.
+
+       menu "Configuration"
+       	    depends on GB_FLASH_CONSTRUCTION
+
+       	    choice
+	      prompt "Flash Profile"
+	      default GB_FLASH_PROFILE_PANDROID
+	      help
+		Select how to construct and organize the flash.
+
+            config GB_FLASH_PROFILE_PANDROID
+       	      bool "Merge pre-build Pandroid FS with G2"
+	      select TARGET_ROOTFS_SQUASHFS
+	      help
+	        Temporary solution until we can build the Android
+		rootfs under OpenWRT.  This profile relies on an
+		externally build Android FS, and folds it into
+		the OpenWRT rootfs.
+
+            config GB_FLASH_PROFILE_MTD
+       	      bool "MTD mgmt - Fast but inflexible"
+	      select TARGET_ROOTFS_SQUASHFS
+	      help
+		Kernel and rootfs images stored in flash partitions.
+		This solution is inflexible in that the kernel and rootfs 
+		are stored on fixed size partitions, and thus cannot
+		gorw in size beyond these parition sizes.  But u-boot
+		access is faster (than with jffs2).
+
+            config GB_FLASH_PROFILE_ROOTFS_ON_DISK
+       	      bool "Kernel in flash, rootfs on disk"
+	      select TARGET_ROOTFS_EXT4FS
+	      help
+	        Kernel stored in flash, but root file system expected
+		to be on attached storage, like a disk drive.  You will
+		have to change CS_UBOOT_ROOTFS_ARGS for this.
+
+            endchoice
+
+	    config CS_UBOOT_ETHADDR0
+       	      string "U-boot Networking: MAC0 Address"
+       	      default "00:13:25:A0:30:42"
+       	    help
+	      u-boot ethaddr0
+
+            config CS_UBOOT_ETHADDR1
+       	      string "U-boot Networking: MAC1 Address"
+       	      default "00:13:25:B0:30:42"
+       	      help
+		u-boot ethaddr1
+	 
+            config CS_UBOOT_ETHADDR2
+       	      string "U-boot Networking: MAC2 Address"
+       	      default "00:13:25:C0:30:42"
+       	      help
+		u-boot ethaddr2
+	 	 
+            config CS_UBOOT_IPADDR
+       	      string "U-boot Networking: IP Address"
+       	      default "192.168.61.99"
+       	      help
+		u-boot ipaddr
+
+            config CS_UBOOT_NETMASK
+       	      string "U-boot Networking: Netmask"
+       	      default "255.255.255.0"
+       	      help
+		u-boot netmask
+
+            config CS_UBOOT_SERVERIP
+       	      string "U-boot Networking: Server IP"
+       	      default "192.168.65.127"
+       	      help
+	        u-boot serverip
+
+            config CS_UBOOT_GATEWAYIP
+       	      string "U-boot Networking: Gateway IP"
+       	      default "192.168.61.1"
+       	      help
+	        u-boot gatewayip
+
+            config CS_UBOOT_ROOTFS_ARGS
+	      string "Root Filesystem Args"
+	      default "root=/dev/ram rdinit=/etc/preinit"
+	      help
+	        bootargs to kernel for finding rootfs
+
+            config CS_UBOOT_MORE_ARGS
+	      string "Additional Bootargs"
+	      default ""
+	      help
+	        Additional bootargs
+
+       endmenu

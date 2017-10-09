@@ -1,0 +1,23 @@
+menu "Configuration"
+     depends on PACKAGE_kmod-g2-sd
+
+config KERNEL_CS752X_SD_25MHZ
+        bool "SD host operating at 25MHz"
+        default n
+        help
+          This configure will change the operation frequency of sd host
+          controller to 25MHz.
+
+config KERNEL_CS752X_SD_DEBUG
+        bool "Enable printing SD driver debug message"
+        default n
+        help
+          If you want to print the sd driver debugging message, enable the option.
+
+config KERNEL_CS752X_SD_REQUEST_ONEPAGE
+        bool "Perform one page data transfer only"
+        default n
+        help
+          If you want to perform one page (4096 byte) data transfer, enable the option.
+
+endmenu

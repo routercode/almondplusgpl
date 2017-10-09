@@ -1,0 +1,85 @@
+menu "Cortina-System platform type"
+	depends on ARCH_GOLDENGATE
+
+config MACH_CORTINA_G2
+	bool "Support Cortina-System G2 platform"
+	select ARM_GIC
+	select CPU_V7
+	help
+	  Include support for Cortex-A9 CPU on Cortina-Systems Baseboard.
+
+choice
+	prompt "G2 Platform Type"
+	default CORTINA_FPGA
+	help
+  	  Pick the G2 platform to build
+
+config CORTINA_FPGA
+       bool "FPGA Verification Board"
+       help
+         Support for the Golden-Gate FPGA board.
+
+config CORTINA_ENGINEERING
+       bool "Engineering Board"
+       help
+         Support for the Golden-Gate engineering board.
+
+config CORTINA_REFERENCE
+       bool "Reference Board"
+       help
+         Support for the Golden-Gate reference board.
+
+endchoice
+
+config ACP
+        bool "Support ACP(Accelerator Coherency Port)"
+        depends on MACH_CORTINA_G2 && !CORTINA_FPGA
+        help
+          Support for the Golden-Gate ASIC. The Accelerator Coherency Port (ACP) is a feature
+          of Cortex-A9, which provides an AXI slave port that can be connected to a DMA engine,
+          providing the DMA access to the SCU of Cortex-A9. Addresses on the ACP port are physical
+          addresses which can be snooped by the SCU to provide full I/O coherency.
+
+config PLATFORM_APB_CLK
+        int "Default APB clock speed(MHZ)"
+        default "100"
+        depends on MACH_CORTINA_G2 && !CORTINA_FPGA
+        help
+          There are three different APB clock for different HW strap pin.
+          100 for CPU clock 400, 600, 700, 800 and 900 MHz(Strap 0~4)
+          150 for CPU clock 750 MHz(Strap 5)
+          170 for CPU clock 850 MHz(Strap 6)
+
+config CS75XX_SSP
+        bool "Support SSP(Synchronous Serial Port)"
+        depends on MACH_CORTINA_G2
+        help
+          SSP can send PCM voice data for SLIC or I2C audio data to DAC.
+
+menuconfig CORTINA_G2_PCIE
+	bool "Support Cortina-System G2 PCIe "
+	select PCI
+	select ARCH_SUPPORTS_MSI
+	select PCI_SYSCALL
+	select PCI_MSI
+	select PCI_LEGACY
+  help
+	  Include support PCIe for Cortex-A9 CPU on Cortina-Systems Baseboard.
+
+if CORTINA_G2_PCIE
+config PCIE_NUM_PORTS
+        int "Numer of PCIe Root Complex ports, 1, 2, 3"
+        depends on CORTINA_G2_PCIE=y
+        default "2"
+        help
+          Number of Root Complex ports supportted by PCIe.
+endif
+
+config CORTINA_G2_USB_HOST
+	bool "Support Cortina-System G2 USB Host driver"
+	select USB_ARCH_HAS_EHCI
+	select USB_ARCH_HAS_OHCI
+  help
+	  Include support USB host for Cortex-A9 CPU on Cortina-Systems Baseboard.
+
+endmenu

@@ -1,0 +1,8 @@
+# Copyright (C) 2010 Cortina Systems, Inc.
+
+config uart-server options
+       option mmap_base		0xf0000000
+       option mmap_bytes	0x08000000
+       option device		/dev/ttyS1
+       option operations	"-sub 0xf0000000"
+

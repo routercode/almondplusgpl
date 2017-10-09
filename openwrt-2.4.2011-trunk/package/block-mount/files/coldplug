@@ -1,0 +1,25 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+boot() {
+        for mount_point in `awk -v node="/mnt" '$2 ~ node {print $2;}' /proc/mounts`; do
+                mnt_point=$(echo -n -e $mount_point)
+                umount "$mnt_point"
+
+                grep "$mount_point" /proc/mounts || {
+                        rm -rf "$mnt_point";
+                }
+        done
+
+
+        for i in sata usb; do
+                subdir=`find /mnt/$i -type d 2>/dev/null | wc -l`
+                if [[ "$subdir" == '0' || "$subdir" == '1' ]] ; then
+                        rm -rf /mnt/$i
+                fi
+        done
+
+
+       udevtrigger
+}

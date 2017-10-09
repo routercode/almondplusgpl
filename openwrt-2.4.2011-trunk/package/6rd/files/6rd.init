@@ -1,0 +1,86 @@
+#!/bin/sh /etc/rc.common
+
+START=48
+STOP=48
+
+start_service() {
+	local section="$1"
+	
+	include /lib/network
+	scan_interfaces
+	config_load /var/state/network
+
+	config_get LANIF lan ifname
+	config_get WANIF wan ifname
+
+	local ENABLED
+	config_get_bool ENABLED "$section" ENABLED 0
+	[ $ENABLED -ne 1 ] && return 0
+
+    	config_get SIXRDTUNIF "$section" SIXRDTUNIF
+	config_get SIXRDTUNMTU "$section" SIXRDTUNMTU
+	config_get SIXRDTUNTTL "$section" SIXRDTUNTTL
+	config_get ISP6RDPREFIX "$section" ISP6RDPREFIX
+	config_get ISP6RDPREFIXLEN "$section" ISP6RDPREFIXLEN
+	config_get ISP6RDBR "$section" ISP6RDBR
+	config_get LOCAL6PREFIXLEN "$section" LOCAL6PREFIXLEN
+	
+	WANIP=`ip -4 addr show dev $WANIF | awk '/inet / {print $2}' | cut -d/ -f 1`
+	WANIPSPACED=`echo $WANIP | tr . ' '`
+	
+	LOCAL6PREFIX=`printf "$ISP6RDPREFIX:%02x%02x:%02x%02x" $WANIPSPACED`
+	
+	# Setup the tunnel interface
+        ip tunnel add $SIXRDTUNIF mode sit ttl $SIXRDTUNTTL remote any local $WANIP
+
+        # Set the MTU
+        ip link set $SIXRDTUNIF mtu $SIXRDTUNMTU                                  
+
+        # Bring up the tunnel interface
+        ip link set $SIXRDTUNIF up              
+
+        # Set the tunnel interface IPv6 address
+        ip -6 addr add $LOCAL6PREFIX:0::1/$ISP6RDPREFIXLEN dev $SIXRDTUNIF
+
+        # Set the LAN interface IPv6 address
+        ip -6 addr add $LOCAL6PREFIX:1::1/$LOCAL6PREFIXLEN dev $LANIF     
+
+        # Set the default IPv6 route to the ISP's IPv4/IPv6 boarder router
+        ip -6 route add ::/0 dev $SIXRDTUNIF          
+        ip -6 route add 2000::/3 via ::$ISP6RDBR dev $SIXRDTUNIF          
+
+        # Enable IPv6 Forwarding
+        sysctl -w net.ipv6.conf.all.forwarding=1 > /dev/null
+}
+
+stop_service() {
+	local section="$1"
+	
+	include /lib/network
+	scan_interfaces
+	config_load /var/state/network
+
+	config_get LANIF lan ifname
+	config_get WANIF wan ifname
+    	config_get SIXRDTUNIF "$section" SIXRDTUNIF
+	config_get ISP6RDPREFIX "$section" ISP6RDPREFIX
+	config_get LOCAL6PREFIXLEN "$section" LOCAL6PREFIXLEN
+	
+	WANIP=`ip -4 addr show dev $WANIF | awk '/inet / {print $2}' | cut -d/ -f 1`
+	WANIPSPACED=`echo $WANIP | tr . ' '`
+	
+	LOCAL6PREFIX=`printf "$ISP6RDPREFIX:%02x%02x:%02x%02x" $WANIPSPACED`
+
+	ip tunnel del $SIXRDTUNIF
+    ip -6 addr del $LOCAL6PREFIX:1::1/$LOCAL6PREFIXLEN dev $LANIF
+}
+
+start() {
+	config_load "6rd"
+	config_foreach start_service 6rd
+}
+
+stop () {
+	config_load "6rd"
+	config_foreach stop_service 6rd
+}

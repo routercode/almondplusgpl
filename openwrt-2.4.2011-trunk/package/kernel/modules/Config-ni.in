@@ -1,0 +1,128 @@
+menu "Configuration"
+     depends on PACKAGE_kmod-g2-ni
+
+config	KERNEL_CS752X_NR_QMBANK
+	int "Number of DRAM Banks for QM(1-7)"
+	range 1 7
+	default "1"
+	---help---
+	  Decide how many DRAM bank be allocated for HW QM. This option works
+	  only if CS752X_HW_INTERNAL_BUFFERS be disabled. i.e. This is exclusive
+	  with CS752X_HW_INTERNAL_BUFFERS. If CS752X_HW_INTERNAL_BUFFERS is enabled,
+	  then all DRAM bank were allocated for Linux kernel. If CS752X_HW_INTERNAL_BUFFERS
+	  is disabled, number of DRAM bank will be reserved for QM module.
+
+choice
+	prompt "Connect which G2 MAC to external switch"
+	default KERNEL_CS75XX_GMAC1_TO_EXT_SWITCH
+
+config KERNEL_CS75XX_GMAC0_TO_EXT_SWITCH
+	bool "GMAC0"
+
+config KERNEL_CS75XX_GMAC1_TO_EXT_SWITCH
+	bool "GMAC1"
+
+config KERNEL_CS75XX_GMAC2_TO_EXT_SWITCH
+	bool "GMAC2"
+
+config KERNEL_CS75XX_NONE_TO_EXT_SWITCH
+	bool "None"
+endchoice
+
+choice
+	prompt "GMAC0 Interface"
+	default KERNEL_CS75XX_GMAC0_RGMII_1000
+
+config KERNEL_CS75XX_GMAC0_MII
+	bool "MII mode"
+
+config KERNEL_CS75XX_GMAC0_RGMII_1000
+	bool "RGMII 1000Mbps mode"
+
+config KERNEL_CS75XX_GMAC0_RGMII_100
+	bool "RGMII 100Mbps mode"
+
+config KERNEL_CS75XX_GMAC0_RMII
+	bool "RMII mode"
+endchoice
+
+config KERNEL_CS75XX_INT_CLK_SRC_RMII_GMAC0
+	bool "Internal clock source in RMII mode of GMAC0"
+	default n
+	---help---
+	Clock source for ports in RMII mode of operation.
+	In RMII mode, reference clock can be sourced from the MAC to PHY or
+	from external source. When enabled, clock is sourced from reference
+	clock and given out of chip. When disabled, clock is sourced from
+	external source and is input to chip.
+
+config KERNEL_CS75XX_PHY_ADDR_GMAC0
+	int "PHY address of GMAC0 (0-31)"
+	range 0 31
+	default "1"
+
+choice
+	prompt "GMAC1 Interface"
+	default KERNEL_CS75XX_GMAC1_RGMII_1000
+
+config KERNEL_CS75XX_GMAC1_MII
+	bool "MII mode"
+
+config KERNEL_CS75XX_GMAC1_RGMII_1000
+	bool "RGMII 1000Mbps mode"
+
+config KERNEL_CS75XX_GMAC1_RGMII_100
+	bool "RGMII 100Mbps mode"
+
+config KERNEL_CS75XX_GMAC1_RMII
+	bool "RMII mode"
+endchoice
+
+config KERNEL_CS75XX_INT_CLK_SRC_RMII_GMAC1
+	bool "Internal clock source in RMII mode of GMAC1"
+	default n
+	---help---
+	Clock source for ports in RMII mode of operation.
+	In RMII mode, reference clock can be sourced from the MAC to PHY or
+	from external source. When enabled, clock is sourced from reference
+	clock and given out of chip. When disabled, clock is sourced from
+	external source and is input to chip.
+
+config KERNEL_CS75XX_PHY_ADDR_GMAC1
+	int "PHY address of GMAC1 (0-31)"
+	range 0 31
+	default "0"
+
+choice
+	prompt "GMAC2 Interface"
+	default KERNEL_CS75XX_GMAC2_RGMII_1000
+
+config KERNEL_CS75XX_GMAC2_MII
+	bool "MII mode"
+
+config KERNEL_CS75XX_GMAC2_RGMII_1000
+	bool "RGMII 1000Mbps mode"
+
+config KERNEL_CS75XX_GMAC2_RGMII_100
+	bool "RGMII 100Mbps mode"
+
+config KERNEL_CS75XX_GMAC2_RMII
+	bool "RMII mode"
+endchoice
+
+config KERNEL_CS75XX_INT_CLK_SRC_RMII_GMAC2
+	bool "Internal clock source in RMII mode of GMAC2"
+	default n
+	---help---
+	Clock source for ports in RMII mode of operation.
+	In RMII mode, reference clock can be sourced from the MAC to PHY or
+	from external source. When enabled, clock is sourced from reference
+	clock and given out of chip. When disabled, clock is sourced from
+	external source and is input to chip.
+
+config KERNEL_CS75XX_PHY_ADDR_GMAC2
+	int "PHY address of GMAC2 (0-31)"
+	range 0 31
+	default "2"
+
+endmenu

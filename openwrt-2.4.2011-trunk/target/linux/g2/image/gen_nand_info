@@ -1,0 +1,70 @@
+#!/bin/bash
+
+usage()
+{
+	echo 'nand_info ECC_Type OOB_Size Block_Size Out_File'
+	echo '  ECC_Type: 0 -> hamming 256, 1 -> hamming 512, 2 -> bch8, 3 -> bch12 '
+	echo '  OOB_Size: Number of bytes *PAST* the page size that makes up the OOB.'
+	echo '  Block_Size: Block size of the NAND FLASH device'
+	echo '  Out_File: The output file'
+}
+
+hex_format()
+{
+	str=$1
+
+ 	for i in `seq 0 2 $(( ${#str} - 1 ))`; do 
+		v="$v\x${str:$i:2}" ; 
+	done; 
+
+	echo $v
+}
+
+
+
+if [ $# -lt 4 ]; then
+	usage
+	exit $LINENO
+fi
+
+ECC_Type=$1
+Page_OOB_Size=$2
+Block_Size=$3
+Out_File=$4
+
+if [[ $ECC_Type -ge 4 || $Page_OOB_Size -eq 0 || $Block_Size -eq 0 ]]; then
+	usage
+	exit $LINENO
+fi
+
+tmp_file=/tmp/nand_info.$USER.$$
+
+rm -rf $tmp_file || exit $LINENO
+rm -rf $Out_File || exit $LINENO
+
+tmp=`printf "%02X" $ECC_Type`
+printf "\x$tmp"  >> $tmp_file
+
+tmp=`printf "%04X" $Page_OOB_Size`
+tmp=`hex_format $tmp`
+printf "$tmp"  >> $tmp_file
+
+tmp=`printf "%08X" $Block_Size`
+tmp=`hex_format $tmp`
+printf "$tmp"  >> $tmp_file
+
+tmp=`sha256sum  $tmp_file`
+tmp=`hex_format $tmp`
+printf "$tmp"  >> $tmp_file
+
+for i in `seq $(( 512 / 39 ))` ; do
+	cat $tmp_file >> $Out_File
+done
+rm $tmp_file
+
+echo $((8192 - 512 % 39 ))
+for i in `seq $((8192 - 512 + 512 % 39 ))` ; do
+	printf '\xff' >> $Out_File
+done
+
+exit 0

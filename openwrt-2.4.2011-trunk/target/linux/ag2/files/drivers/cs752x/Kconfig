@@ -1,0 +1,104 @@
+menu "Cortina Systems Goldengate SOC drivers"
+
+config CS752X_PROC
+       bool "Turn on debugging features"
+       select PRINTK
+       select PROC_FS
+       default y
+       help
+         Allow users to control CS752X debug flags and other variables 
+         from proc filesystems.
+         They are allocated in /proc/drivers/cs752x/*.
+
+source "drivers/cs752x/ni/Kconfig"
+
+config CS752X_AHCI
+       tristate "AHCI Serial ATA"
+       select ATA
+       help
+	This option enables support for Golden-Gate AHCI Serial ATA.
+
+source "drivers/cs752x/char/Kconfig"
+
+config GPIO_CS75XX
+       tristate "G2 GPIO support"
+       select GPIOLIB
+       help
+	Goldengate GPIO sub-system
+
+config I2C_CS75XX
+       tristate "I2C(BIW) controller"
+       select I2C
+       select I2C_BOARDINFO
+       help
+         Built-in I2C interface on the Cortina CS75XX of host bridges.
+
+source "drivers/cs752x/lcd/Kconfig"
+
+config RTC_DRV_G2
+       tristate "Real Time Clock support"
+       select RTC_CLASS
+       help
+         Support for the RTC found on the GoldenGate Soc.
+
+source "drivers/cs752x/sd/Kconfig"
+
+source "drivers/cs752x/spdif/Kconfig"
+
+config SPI_CS75XX
+       tristate "SPI Master support"
+       select SPI
+       select SPI_MASTER
+       help
+	 This enables using the SPI master controller on the CS75XX chips
+
+config SPI_AGENT
+       tristate "SPI device agent"
+       depends on SPI_CS75XX
+       help
+         This supports SPI slave drivers.
+
+source "drivers/cs752x/media/Kconfig"
+
+config G2_WATCHDOG
+       tristate "Watchdog Timer"
+       select WATCHDOG
+       help
+         Watchdog timer block in Goldengate chips. This will
+  	 reboot the system when the timer expires with the watchdog
+  	 enabled.
+
+source "drivers/cs752x/mtd/Kconfig"
+
+config CORTINA_G2_ADMA
+        tristate "Cortina G2 ADMA support"
+        select DMA_ENGINE
+        help
+          Enable support for the Cortina-Systems(R) CS75xx Series built-in DMA engines.
+
+config SERIAL_CORTINA
+        bool "CORTINA serial port support"
+        select SERIAL_CORE
+        help
+          If you have a board based on a Cortina, you
+          can enable its onboard serial port by enabling this option.
+
+config SERIAL_CORTINA_CONSOLE
+        bool "Console on CORTINA serial port"
+        depends on SERIAL_CORTINA=y
+        select SERIAL_CORE_CONSOLE
+        help
+          If you have enabled the serial port on the Cortina baseboard
+          you can make it the console by answering Y to this option.
+
+          Even if you say Y here, the currently visible virtual console
+          (/dev/tty0) will still be used as the system console by default, but
+          you can alter that using a kernel command line option such as
+          "console=ttyS0". (Try "man bootparam" or see the documentation of
+          your boot loader (lilo or loadlin) about how to pass options to the
+          kernel at boot time.)
+
+source "drivers/cs752x/telephony/Kconfig"
+
+endmenu
+

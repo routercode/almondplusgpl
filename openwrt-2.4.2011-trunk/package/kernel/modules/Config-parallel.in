@@ -1,0 +1,146 @@
+menu "Configuration"
+     depends on PACKAGE_kmod-g2-mtd-parallel
+
+config KERNEL_FTL
+	tristate "FTL (Flash Translation Layer) support"
+	default y
+	---help---
+	  This provides support for the original Flash Translation Layer which
+	  is part of the PCMCIA specification. It uses a kind of pseudo-
+	  file system on a flash device to emulate a block device with
+	  512-byte sectors, on top of which you put a 'normal' file system.
+
+	  You may find that the algorithms used in this code are patented
+	  unless you live in the Free World where software patents aren't
+	  legal - in the USA you are only permitted to use this on PCMCIA
+	  hardware, although under the terms of the GPL you're obviously
+	  permitted to copy, modify and distribute the code as you wish. Just
+	  not use it.
+
+menu "RAM/ROM/Flash chip drivers"
+
+config KERNEL_MTD_MAP_BANK_WIDTH_2
+	bool "Support 16-bit buswidth"
+	default y
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  16 bits wide, say 'Y'.
+
+config KERNEL_MTD_MAP_BANK_WIDTH_4
+	bool "Support 32-bit buswidth"
+	default y
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  32 bits wide, say 'Y'.
+
+config KERNEL_MTD_MAP_BANK_WIDTH_8
+	bool "Support 64-bit buswidth"
+	default n
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  64 bits wide, say 'Y'.
+
+config KERNEL_MTD_MAP_BANK_WIDTH_16
+	bool "Support 128-bit buswidth"
+	default n
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  128 bits wide, say 'Y'.
+
+config KERNEL_MTD_MAP_BANK_WIDTH_32
+	bool "Support 256-bit buswidth"
+	default n
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  256 bits wide, say 'Y'.
+
+config KERNEL_MTD_CFI_I1
+	bool "Support 1-chip flash interleave"
+	default y
+	help
+	  If your flash chips are not interleaved - i.e. you only have one
+	  flash chip addressed by each bus cycle, then say 'Y'.
+
+config KERNEL_MTD_CFI_I2
+	bool "Support 2-chip flash interleave"
+	default y
+	help
+	  If your flash chips are interleaved in pairs - i.e. you have two
+	  flash chips addressed by each bus cycle, then say 'Y'.
+
+config KERNEL_MTD_CFI_I4
+	bool "Support 4-chip flash interleave"
+	default n
+	help
+	  If your flash chips are interleaved in fours - i.e. you have four
+	  flash chips addressed by each bus cycle, then say 'Y'.
+
+config KERNEL_MTD_CFI_I8
+	bool "Support 8-chip flash interleave"
+	default n
+	help
+	  If your flash chips are interleaved in eights - i.e. you have eight
+	  flash chips addressed by each bus cycle, then say 'Y'.
+
+config KERNEL_MTD_CFI_AMDSTD
+	tristate "Support for AMD/Fujitsu/Spansion flash chips"
+	default y
+	help
+	  The Common Flash Interface defines a number of different command
+	  sets which a CFI-compliant chip may claim to implement. This code
+	  provides support for one of those command sets, used on chips
+	  including the AMD Am29LV320.
+endmenu
+
+menu "Mapping drivers for chip access"
+
+config KERNEL_MTD_CORTINA_CS752X_CFI
+        tristate "CFI Flash device mapped on CORTINA_G2"
+	default y
+        help
+          Map driver for CORTINA_G2 demo board.
+
+config KERNEL_CORTINA_CS752X_SHARE_PIN
+        tristate "Parallel Flash share pin on CORTINA_G2 ASIC"
+endmenu
+
+menu "Self-contained MTD device drivers"
+
+config KERNEL_MTD_MTDRAM
+	tristate "Test driver using RAM"
+	default y
+	help
+	  This enables a test MTD device driver which uses vmalloc() to
+	  provide storage.  You probably want to say 'N' unless you're
+	  testing stuff.
+
+config KERNEL_MTDRAM_TOTAL_SIZE
+	int "MTDRAM device size in KiB"
+	default "4096"
+	help
+	  This allows you to configure the total size of the MTD device
+	  emulated by the MTDRAM driver.  If the MTDRAM driver is built
+	  as a module, it is also possible to specify this as a parameter when
+	  loading the module.
+
+config KERNEL_MTDRAM_ERASE_SIZE
+	int "MTDRAM erase block size in KiB"
+	default "128"
+	help
+	  This allows you to configure the size of the erase blocks in the
+	  device emulated by the MTDRAM driver.  If the MTDRAM driver is built
+	  as a module, it is also possible to specify this as a parameter when
+	  loading the module.
+
+config KERNEL_MTDRAM_ABS_POS
+        hex "SRAM Hexadecimal Absolute position or 0"
+        default "0"
+        help
+          If you have system RAM accessible by the CPU but not used by Linux
+          in normal operation, you can give the physical address at which the
+          available RAM starts, and the MTDRAM driver will use it instead of
+          allocating space from Linux's available memory. Otherwise, leave
+          this set to zero. Most people will want to leave this as zero.
+
+endmenu
+endmenu

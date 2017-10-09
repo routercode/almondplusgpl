@@ -1,0 +1,20 @@
+--- a/src/rfc2131.c	2010-06-06 12:22:30.000000000 -0700
++++ b/src/rfc2131.c.orig	2011-06-10 16:29:14.792967356 -0700
+@@ -1372,7 +1372,7 @@
+       clear_packet(mess, end);
+       option_put(mess, end, OPTION_MESSAGE_TYPE, 1, DHCPACK);
+       option_put(mess, end, OPTION_SERVER_IDENTIFIER, INADDRSZ, ntohl(server_id(context, override, fallback).s_addr));
+-      
++#if 0     
+       if (lease)
+ 	{
+ 	  if (lease->expires == 0)
+@@ -1382,7 +1382,7 @@
+ 	  option_put(mess, end, OPTION_LEASE_TIME, 4, time);
+ 	  lease_set_interface(lease, int_index);
+ 	}
+-
++#endif
+       do_options(context, mess, end, req_options, hostname, get_domain(mess->ciaddr),
+ 		 domain, tagif_netid, subnet_addr, fqdn_flags, borken_opt, pxearch, uuid, vendor_class_len);
+       

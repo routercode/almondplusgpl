@@ -1,0 +1,10 @@
+config DVB_CS75XX_TS
+       tristate "Transport Stream support"
+       select MEDIA_SUPPORT
+       select DVB_CORE
+       select DVB_CAPTURE_DRIVERS
+       help
+	 Since this module have no MPEG decoder onboard, they transmit
+  	 only compressed MPEG data over the AXI bus, so you need
+  	 an external software decoder to watch TV on your computer.
+

@@ -1,0 +1,12 @@
+diff -Naur linux-2.6.36/arch/arm/tools/mach-types linux-2.6.36-new/arch/arm/tools/mach-types
+--- linux-2.6.36/arch/arm/tools/mach-types	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/arch/arm/tools/mach-types	2011-09-04 11:02:27.000000000 -0700
+@@ -836,7 +836,7 @@
+ ccxp270			MACH_CCXP		CCXP			825
+ omap_gsample		MACH_OMAP_GSAMPLE	OMAP_GSAMPLE		826
+ realview_eb		MACH_REALVIEW_EB	REALVIEW_EB		827
+-samoa			MACH_SAMOA		SAMOA			828
++cortina_goldengate			MACH_GOLDENGATE		CORTINA_G2			828
+ palmt3			MACH_PALMT3		PALMT3			829
+ i878			MACH_I878		I878			830
+ borzoi			MACH_BORZOI		BORZOI			831

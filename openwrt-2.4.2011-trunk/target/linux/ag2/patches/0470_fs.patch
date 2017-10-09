@@ -1,0 +1,12 @@
+diff -Naur linux-2.6.36/fs/fs-writeback.c linux-2.6.36-new/fs/fs-writeback.c
+--- linux-2.6.36/fs/fs-writeback.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/fs/fs-writeback.c	2011-09-04 11:02:56.000000000 -0700
+@@ -974,6 +974,8 @@
+ 		 */
+ 		if (!was_dirty) {
+ 			bdi = inode_to_bdi(inode);
++			if (!bdi)
++				goto out;
+ 
+ 			if (bdi_cap_writeback_dirty(bdi)) {
+ 				WARN(!test_bit(BDI_registered, &bdi->state),

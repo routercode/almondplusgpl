@@ -1,0 +1,242 @@
+config ADDITIONAL_HOST_TOOLS
+       string "Additional host tools needed"
+       depends TARGET_g2
+       default ""
+       help
+         Additional tools in ./tools/ that need to be compiled
+	 on the build host to build this target.
+
+config FLASH_CONSTRUCTION
+       bool "Build Flash Images"
+       depends !TARGET_ROOTFS_INITRAMFS
+       depends TARGET_g2
+       default n
+       help
+         Build flash.bin and various software download images
+	 to support the G2 platform and system upgrade.
+
+       menu "Configuration"
+       	    depends on FLASH_CONSTRUCTION
+
+       	    choice
+	      prompt "Flash Profile"
+	      default FLASH_MTD64M
+	      help
+		Select how to construct and organize the flash.
+
+
+       	    config FLASH_PROFILE_JFFS
+       	      bool "JFFS2 mgmt"
+	      select TARGET_ROOTFS_SQUASHFS
+	      help
+		Kernel and rootfs images stored in a JFFS2 partition on
+		the flash.  This solution is flexible in that the
+		kernel and rootfs can shrink or grow without worrying
+		about flash partition sizes.  But, u-boot access of JFFS2
+		is slow, affecting overall boot up time.
+
+            config FLASH_PROFILE_MTD64M
+       	      bool "MTD mgmt - 64Mb devices"
+	      select TARGET_ROOTFS_SQUASHFS
+	      help
+		Kernel and rootfs images stored in flash partitions.
+		This solution is inflexible in that the kernel and rootfs 
+		are stored on fixed size partitions, and thus cannot
+		gorw in size beyond these parition sizes.  But u-boot
+		access is faster (than with jffs2).
+
+            config FLASH_PROFILE_MTD64M_256K
+       	      bool "MTD mgmt - 64Mb devices_256"
+	      help
+		This options works on serial and NOR flash if its size is 
+		64M and its erase size is 256K
+		Kernel and rootfs images stored in flash partitions.
+		This solution is inflexible in that the kernel and rootfs 
+		are stored on fixed size partitions, and thus cannot
+		gorw in size beyond these parition sizes.  But u-boot
+		access is faster (than with jffs2).
+
+            config FLASH_PROFILE_MTD16M
+       	      bool "MTD mgmt - 16Mb devices"
+	      select TARGET_ROOTFS_SQUASHFS
+	      help
+		Kernel and rootfs images stored in flash partitions.
+		This solution is inflexible in that the kernel and rootfs 
+		are stored on fixed size partitions, and thus cannot
+		gorw in size beyond these parition sizes.  But u-boot
+		access is faster (than with jffs2).
+
+            config FLASH_PROFILE_MTD128M
+       	      bool "MTD mgmt - 128Mb devices"
+	      select TARGET_ROOTFS_SQUASHFS
+	      help
+		Kernel and rootfs images stored in flash partitions.
+		This solution is inflexible in that the kernel and rootfs 
+		are stored on fixed size partitions, and thus cannot
+		gorw in size beyond these parition sizes.  But u-boot
+		access is faster (than with jffs2).
+
+            config FLASH_PROFILE_ROOTFS_ON_DISK
+       	      bool "Kernel in flash, rootfs on disk"
+	      select TARGET_ROOTFS_EXT4FS
+	      help
+	        Kernel stored in flash, but root file system expected
+		to be on attached storage, like a disk drive.  You will
+		have to change CS_UBOOT_ROOTFS_ARGS for this.
+
+            config FLASH_PROFILE_NAND
+       	      bool "NAND Flash Images"
+	      select TARGET_ROOTFS_SQUASHFS 
+	      select NAND_INFO_BIN
+	      help
+	        Use this selection if you are using NAND flash.  The
+		rootfs is a JFFS2 file system.  There is no overlay.
+
+            endchoice
+
+            config CS_FLASH_NAME
+		string "The identifier name for partitions"
+		help
+		  The Cortina flash driver uses this string to parse the 
+		  partitions information following thie identifier name.
+
+	
+            config BOOTLOADER_ENCRYPTED_KEY
+	       string "The private key used encrypted bootlader"
+	       help
+		The location of the private key. It is used to encrypted
+		bootloader imaged
+
+            config BOOTLOADER_MRBV
+	      int "MRBV value"
+	      default 0
+	      help
+		Minimum Roll Back Version Number is a small TLV that
+		provides the customer the ability to reject roll back
+		of stage 1 boot up images. It is embedded into bootloader
+
+	    config NAND_INFO_BIN
+		bool "Build Nand information Image"
+		default true
+       		depends FLASH_PROFILE_NAND 
+
+       		menu "Configuration"
+       			depends NAND_INFO_BIN
+
+			config NAND_FLASH_OOB_SIZE
+			  int "Nand Flash OOB Size"
+			  default 64
+
+			config NAND_FLASH_BLOCK_SIZE
+			  int "Nand Flash Block Size"
+			  default 131072
+		endmenu
+
+
+	    config CS_UBOOT_ETHADDR0
+       	      string "U-boot Networking: MAC0 Address"
+       	      default "00:13:25:A0:30:42"
+       	    help
+	      u-boot ethaddr0
+
+            config CS_UBOOT_ETHADDR1
+       	      string "U-boot Networking: MAC1 Address"
+       	      default "00:13:25:B0:30:42"
+       	      help
+		u-boot ethaddr1
+	 
+            config CS_UBOOT_ETHADDR2
+       	      string "U-boot Networking: MAC2 Address"
+       	      default "00:13:25:C0:30:42"
+       	      help
+		u-boot ethaddr2
+	 	 
+	    config CS_UBOOT_WIFIADDR0
+       	      string "U-boot Networking: WiFi MAC0 Address"
+       	      default "00:01:73:01:FF:10"
+       	    help
+	      u-boot wifiaddr0
+
+            config CS_UBOOT_WIFIADDR1
+       	      string "U-boot Networking: WiFi MAC1 Address"
+       	      default "00:01:73:01:FF:20"
+       	      help
+		u-boot wifiaddr1
+	 
+            config CS_UBOOT_IPADDR
+       	      string "U-boot Networking: IP Address"
+       	      default "192.168.61.99"
+       	      help
+		u-boot ipaddr
+
+            config CS_UBOOT_NETMASK
+       	      string "U-boot Networking: Netmask"
+       	      default "255.255.255.0"
+       	      help
+		u-boot netmask
+
+            config CS_UBOOT_SERVERIP
+       	      string "U-boot Networking: Server IP"
+       	      default "192.168.65.127"
+       	      help
+	        u-boot serverip
+
+            config CS_UBOOT_GATEWAYIP
+       	      string "U-boot Networking: Gateway IP"
+       	      default "192.168.61.1"
+       	      help
+	        u-boot gatewayip
+
+            config CS_UBOOT_ROOTFS_ARGS
+	      string "Root Filesystem Args"
+	      default ""
+	      help
+	        bootargs to kernel for finding rootfs
+
+            config G2_UBOOT_ENV_SIZE
+	      int "U-Boot environment partition size"
+	      default ""
+	      help
+	        U-Boot stores its environment variable in a partition.
+		This size is the partitions size. It must be greate equal 
+		or great than one erase sector size.
+
+            config G2_UBOOT_ENV_OFFSET
+	      int "U-Boot environment partition offset"
+	      default ""
+	      help
+	        U-Boot stores its environment variable in a partition.
+		This value is the offset from flash beginning .
+
+            config G2_UBOOT_ENV_RANGE
+	      int "U-Boot environment partition range"
+	      default ""
+	      help
+	        U-Boot stores its environment variable in a partition.
+		This value is the partitions range. Used for nand flash.
+	
+            config G2_LOADER_ADDR
+	      int "Bootloader Address"
+	      default "0"
+	      help
+		This is the bootloader addr
+
+            config G2_LOADER2_ADDR
+	      int "2nd Bootloader Address"
+	      default ""
+	      help
+		This is the 2nd booatloader addr
+
+            config CS_UBOOT_MORE_ARGS
+	      string "Additional Bootargs"
+	      default ""
+	      help
+	        Additional bootargs
+
+            config CS_UBOOT_MTDPARTS_ARGS
+	      string "Additional arguments of the mtdparts "
+	      default ""
+	      help
+		Additional arguments on the mtdparts environment of u-boot
+
+       endmenu

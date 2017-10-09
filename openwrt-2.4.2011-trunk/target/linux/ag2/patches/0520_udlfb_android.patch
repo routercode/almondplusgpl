@@ -1,0 +1,38 @@
+--- linux-2.6.36/drivers/staging/udlfb/udlfb.c~	2011-08-31 14:55:53.189606885 -0700
++++ linux-2.6.36/drivers/staging/udlfb/udlfb.c	2011-09-01 16:33:30.868805706 -0700
+@@ -25,7 +25,6 @@
+ #include <linux/fb.h>
+ #include <linux/vmalloc.h>
+ #include <linux/slab.h>
+-
+ #include "udlfb.h"
+ 
+ static struct fb_fix_screeninfo dlfb_fix = {
+@@ -889,7 +888,7 @@
+ {
+ 	struct dlfb_data *dev = info->par;
+ 
+-	dl_notice("set_par mode %dx%d\n", info->var.xres, info->var.yres);
++	// dl_notice("set_par mode %dx%d\n", info->var.xres, info->var.yres);
+ 
+ 	return dlfb_set_video_mode(dev, &info->var);
+ }
+@@ -1295,7 +1294,17 @@
+ 	 */
+ 	info->fix = dlfb_fix;
+ 	info->fix.line_length = var->xres * (var->bits_per_pixel / 8);
+-	videomemorysize = info->fix.line_length * var->yres;
++	// Android uses yres_virtual for its calculations
++	videomemorysize = info->fix.line_length * (var->yres * 2);
++	// Android rounds up to page size
++	videomemorysize = (videomemorysize + (PAGE_SIZE-1)) & ~(PAGE_SIZE-1);
++
++	printk(KERN_INFO "fbdev: videomemorysize=%d; line length=%d, xres=%d, bpp=%d, yres=%d, yres_virtual=%d, PS=%d\n",
++	       videomemorysize,
++	       info->fix.line_length,
++	       var->xres,
++	       var->bits_per_pixel,
++	       var->yres, (var->yres * 2), PAGE_SIZE);
+ 
+ 	/*
+ 	 * The big chunk of system memory we use as a virtual framebuffer.

@@ -1,0 +1,44 @@
+#!/bin/sh
+# Copyright (C) 2008-2010 OpenWrt.org
+SCRIPT_DIR=/etc/cs75xx/hw_accel/demo
+
+#Remove RT3593 WebGUI file
+rm -rf /usr/lib/lua/luci/model/cbi/rt3593.lua
+rm -rf /lib/wifi/rt3593.sh
+rm -rf /usr/lib/lua/luci/model/cbi/ar988x.lua
+rm -rf /lib/wifi/ar9880.sh
+rm -rf /usr/lib/lua/luci/model/cbi/ar9380.lua
+rm -rf /lib/wifi/ar9380.sh
+echo "RT3593/AR988x GUI had been removed! Switch to CLI testing Mode."
+
+value=$1
+
+if [ "$value" != "0" ] && [ "$value" != "6" ] && [ "$value" != "7" ] && [ "$value" != "11" ] && [ "$value" -gt -3 ] && [ "$value" -lt 18 ]; then
+	cp -f $SCRIPT_DIR/network.reset /etc/config/network
+if  [ "$value" -lt 18 ]; then
+        echo "Disable PKT_BUF for QM"
+        fw_setenv QM_INT_BUFF 0
+        sleep 1
+elif [ "$value" == "10" ]; then
+        echo "Disable PKT_BUF for QM"
+        fw_setenv QM_INT_BUFF 0
+        sleep 1
+elif [ "$value" == "12" ]; then
+        echo "Disable PKT_BUF for QM"
+        fw_setenv QM_INT_BUFF 0
+        sleep 1
+elif [ "$value" == "13" ]; then
+	cp -f $SCRIPT_DIR/network_pppoe.reset /etc/config/network
+        echo "Disable PKT_BUF for QM"
+        fw_setenv QM_INT_BUFF 0
+        sleep 1
+else
+        echo "Enable PKT_BUFF for QM"
+        fw_setenv QM_INT_BUFF 256
+	sleep 1
+fi
+	echo $value > $SCRIPT_DIR/mode_id
+	echo "MODE_ID has been changed, please reboot."
+else
+	echo "MODE_ID is out of range (-1 / -2 / 1 / 2 / 3 / 4 / 5 / 8 / 9 / 10 / 12 / 14 / 16 / 17)"
+fi

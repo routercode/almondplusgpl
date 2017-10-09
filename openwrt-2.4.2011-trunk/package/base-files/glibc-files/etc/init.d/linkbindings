@@ -1,0 +1,32 @@
+#!/bin/sh /etc/rc.common
+#
+# Copyright (C) 2011 OpenWrt.org
+#
+
+START=04
+
+start() {
+        if [ -e /sbin/ldconfig ] && [ -e /etc/ld.so.conf ]; then
+		if [ -h /etc/ld.so.cache ]; then
+			# cache exist and is symlink
+			# parse file where the symlink points
+			symtarget=$(ls -l /etc/ld.so.cache | sed 's/.*->\ //g')
+			#update cache from file where the symlink from /etc/ld.so.cache points
+			/sbin/ldconfig -C $symtarget
+			echo "runtime shared library bindings updated to /etc/ld.so.cache symlink "$symtarget
+		else
+	                if [ ! -e /etc/ld.so.cache ]; then
+        	        	# cache does not yet exist, create it as a symlink to /tmp/ld.so.cache
+                	        echo "creating symlink from /etc/ld.so.cache to /tmp/ld.so.cache"
+                        	ln -s /tmp/ld.so.cache /etc/ld.so.cache
+	                        /sbin/ldconfig -C /tmp/ld.so.cache
+        	                echo "runtime shared library bindings updated to /etc/ld.so.cache symlink /tmp/ld.so.cache"
+                	else
+                		# cache does not exist as a symlink or is not pointing to /tmp
+                		# let ldconfig update cache from default position (/etc/ld.so.cache)
+                		/sbin/ldconfig
+                		echo "runtime shared library bindings updated to /etc/ld.so.cache"
+                	fi
+                fi
+        fi
+}

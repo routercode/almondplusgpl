@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Copyright (C) 2009 OpenWrt.org
+
+local adapter sub
+adapter="adapter"${DEVICENAME:3:1}
+sub=${DEVICENAME:5}
+
+case "$ACTION" in
+	add)
+		logger Add DVB device: $DEVICENAME
+
+		chmod oug+rw /dev/$DEVICENAME
+		mkdir -p /dev/dvb/$adapter
+		ln -s /dev/$DEVICENAME /dev/dvb/$adapter/$sub
+	;;
+	remove)
+		rm -rf /dev/dvb/$adapter/
+	;;
+esac

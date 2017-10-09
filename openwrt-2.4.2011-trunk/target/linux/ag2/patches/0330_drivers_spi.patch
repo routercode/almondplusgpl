@@ -1,0 +1,100 @@
+diff -Naur linux-2.6.36/drivers/spi/spi.c linux-2.6.36-new/drivers/spi/spi.c
+--- linux-2.6.36/drivers/spi/spi.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/spi/spi.c	2011-09-04 11:04:26.000000000 -0700
+@@ -27,6 +27,9 @@
+ #include <linux/slab.h>
+ #include <linux/mod_devicetable.h>
+ #include <linux/spi/spi.h>
++#ifdef CONFIG_SPI_SPIDEV
++#include <linux/spi/spidev.h>
++#endif
+ #include <linux/of_spi.h>
+ 
+ 
+@@ -156,14 +159,18 @@
+ static int spi_drv_probe(struct device *dev)
+ {
+ 	const struct spi_driver		*sdrv = to_spi_driver(dev->driver);
+-
++#ifdef CONFIG_SPI_SPIDEV
++	spidev_probe(to_spi_device(dev));
++#endif
+ 	return sdrv->probe(to_spi_device(dev));
+ }
+ 
+ static int spi_drv_remove(struct device *dev)
+ {
+ 	const struct spi_driver		*sdrv = to_spi_driver(dev->driver);
+-
++#ifdef CONFIG_SPI_SPIDEV
++	spidev_remove(to_spi_device(dev));
++#endif
+ 	return sdrv->remove(to_spi_device(dev));
+ }
+ 
+diff -Naur linux-2.6.36/drivers/spi/spidev.c linux-2.6.36-new/drivers/spi/spidev.c
+--- linux-2.6.36/drivers/spi/spidev.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/spi/spidev.c	2011-09-04 11:04:26.000000000 -0700
+@@ -557,8 +557,11 @@
+ static struct class *spidev_class;
+ 
+ /*-------------------------------------------------------------------------*/
+-
++#ifdef CONFIG_ARCH_GOLDENGATE
++int spidev_probe(struct spi_device *spi)
++#else
+ static int __devinit spidev_probe(struct spi_device *spi)
++#endif
+ {
+ 	struct spidev_data	*spidev;
+ 	int			status;
+@@ -606,8 +609,15 @@
+ 
+ 	return status;
+ }
+-
++#ifdef CONFIG_ARCH_GOLDENGATE
++EXPORT_SYMBOL(spidev_probe);
++#endif
++
++#ifdef CONFIG_ARCH_GOLDENGATE
++int spidev_remove(struct spi_device *spi)
++#else
+ static int __devexit spidev_remove(struct spi_device *spi)
++#endif
+ {
+ 	struct spidev_data	*spidev = spi_get_drvdata(spi);
+ 
+@@ -628,6 +638,9 @@
+ 
+ 	return 0;
+ }
++#ifdef CONFIG_ARCH_GOLDENGATE
++EXPORT_SYMBOL(spidev_remove);
++#endif
+ 
+ static struct spi_driver spidev_spi_driver = {
+ 	.driver = {
+@@ -665,18 +678,22 @@
+ 		return PTR_ERR(spidev_class);
+ 	}
+ 
++#ifndef CONFIG_ARCH_GOLDENGATE
+ 	status = spi_register_driver(&spidev_spi_driver);
+ 	if (status < 0) {
+ 		class_destroy(spidev_class);
+ 		unregister_chrdev(SPIDEV_MAJOR, spidev_spi_driver.driver.name);
+ 	}
++#endif
+ 	return status;
+ }
+ module_init(spidev_init);
+ 
+ static void __exit spidev_exit(void)
+ {
++#ifndef CONFIG_ARCH_GOLDENGATE
+ 	spi_unregister_driver(&spidev_spi_driver);
++#endif
+ 	class_destroy(spidev_class);
+ 	unregister_chrdev(SPIDEV_MAJOR, spidev_spi_driver.driver.name);
+ }

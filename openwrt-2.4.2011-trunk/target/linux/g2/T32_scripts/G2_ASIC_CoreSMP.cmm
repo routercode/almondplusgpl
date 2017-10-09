@@ -1,0 +1,85 @@
+
+;*********************
+;JTAG DEBUGGER SET UP
+;*********************
+;Open CPU system window
+;res
+SYSTEM
+SYSTEM.RESET
+SYSTEM.OPTION ENRESET OFF
+SYSTEM.CPU CortexA9MPCoreSMP2
+;by default the JTAG clock is set to 10Mhz
+;SYSTEM.JTAGCLOCK
+
+;**********************
+;CORESIGHT SYSTEM SETUP
+;***********************
+;JTAG SCAN CHAIN DIAGNOSIS: If you get IR_Width = 4 (ARM7, ARM9, Cortex) or IR_Width = 5 (ARM11)
+;DIAG 3400
+;Read ROM Table
+;AREA
+;DIAG 3411
+
+;R-T Memory Access
+SYSTEM.MULTICORE MEMORYACCESSPORT 0
+SYSTEM.MULTICORE DEBUGACCESSPORT 1
+;SYStem.MultiCore JTAGACCESSPORT 2
+
+;Setting Core debug register access
+;SYSTEM.MULTICORE COREBASE APB:0x00110000
+;SYSTEM.MULTICORE COREBASE APB:0x00112000
+;SYS.CONFIG DEBUGBASE DAP:0x00110000 DAP:0x00112000
+
+system.CONFIG COREBASE  0x80110000 0x80112000
+sys.up
+
+B::TRONCHIP.SET DABORT OFF
+B::TRONCHIP.SET PABORT OFF
+B::TRONCHIP.SET UNDEF OFF
+
+; Disable ROM map
+data.set 0xf0000010 %l 0x0001fc01
+data.set 0xf5010c00 %l 0x00000001
+
+r.s r1 0x33C	; mach-id
+r.s r2 0x00000100	; atag position
+;r.s pc 0xf6a00000	; post.bin
+r.s pc 0x01600000	; zImage
+
+; Init UART
+data.set 0xf0070110 %l 0x000516e3	; Enable UART0,RX,TX,baudrate to 115200. Assume APB_CLK=100M
+data.set 0xf0070118 %l 0x0000028b	; Sample rate
+data.set 0xf0070120 %b 0x4F		; print 'O'
+data.set 0xf0070120 %b 0x4B		; print 'K'
+data.set 0xf0070120 %b 0x21		; print '!'
+data.set 0xf0070120 %b 0x0D		;
+data.set 0xf0070120 %b 0x0A		;
+
+d.load.binary Q:\FPGA\g2-2.6.36\G2_0818_36\g2\openwrt-2.4.2011-trunk\build_dir\linux-g2_ref\linux-2.6.36\arch\arm\boot\zImage 0x1600000 /verify
+d.load.elf Q:\FPGA\g2-2.6.36\G2_0818_36\g2\openwrt-2.4.2011-trunk\build_dir\linux-g2_ref\linux-2.6.36\vmlinux /nocode
+
+go
+end
+
+
+;Setting PTM
+SYSTEM.MULTICORE ETMBASE APB:0x0011C000
+
+;Setting ETB
+SYSTEM.MULTICORE ETBBASE APB:0x00001000
+
+;Setting TPIU
+SYSTEM.MULTICORE TPIUBASE APB:0x00003000
+
+;Setting Funnel
+SYSTEM.MULTICORE FUNNELBASE APB:0x00004000
+SYSTEM.MULTICORE ETMFUNNELPORT 0
+
+;To activate external trace via TPIU instead into the ETB you need to set, but it is the default if there is an ETM Preprocessor connected
+;Trace.Method Analyzer
+;To activate the ETB
+;Trace.Method ONCHIP
+
+;SYSTEM.UP
+;end
+

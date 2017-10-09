@@ -1,0 +1,60 @@
+Cortina Packet Description File
+
+//1. test enviornment: Ixia P0 --> LAN(eth1) <--> WAN(eth2) --> Ixia P1
+//2. cd /usr/bin/pktgen_des
+//3. pktgen -s eth1 -c eth2 -i packet_ipv6_tcp.des -o packet_ipv6_tcp.des
+//4. expect result: mtu=1514, CPU sent packet length = 4096 bytes, Ixia P1 receive 3 packets, 1518, 1518, 1140
+//  4256 = 1518 + 1518 + 1220
+//  L2 header = 14
+//  IPv6 header = 40
+//  TCP header = 20
+//  CRC = 4
+//  4096 + 74 + 74 + (4 * 3) = 4176
+// 0 -------------------------------------------------------------------------
+Begin Packet:
+        PacketType:             L4
+        PacketLength:           4096
+        PacketNumber:           1
+        L2:                     Ethernet-II
+                DA:             00:ee:ff:ff:ff:ff
+                SA:             88:11:22:33:44:99
+                EtherType:      0x86DD
+        L2: end
+        L3:             IPV6
+                        SIP:            1.2.3.4.5.6.7.8.9.10.11.12.13.14.15.16
+                        DIP:            21.22.23.24.25.26.27.28.29.30.31.32.33.34.35.36
+                        Traffic         1
+                        Flow            1
+                        HopLimit        64
+                        NextHeader      6
+                        chksum          0               // 1: do check sum, 0: no chksum
+                L3:             end
+                L4:             TCP
+                        Sport:          10
+                        Dport:          80
+                        chksum          1               // 1: do check sum, 0: no chksum
+                        Sequence        random
+                        acknowledge     random
+                        urg_flag        0
+                        ack_flag        0
+                        push_flag       0
+                        rst_flag        0
+                        syn_flag        0
+                        fin_flag        0
+                        window          random
+                        urgent_ptr      0
+                L4: end
+        PAYLOAD:                Sequential
+                Start:          0
+                Step:           1
+        Signature:      begin
+                SRC_PID:        1     //source port id 0,1,2,3,4
+                DEST_PID:       0xf     //destination port id, unicast: 0,1,2,3,4
+                                  //     broadcat : 0xf
+                                  //     multicast : 0xE, look for md_pid for multicast destination port id
+                QID:            2     // Queue id : 0,1,2,3
+                MD_PID :        0x3     //If DEST_PID = 0xE, see the value for destination
+                                  // for example id this valueis = 0b0000_0111, then port 0,1,2 will receive the packet
+        Signature : end
+        PAYLOAD end
+End packet

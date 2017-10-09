@@ -1,0 +1,52 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+# OpenWRT should be up and stable by now.
+# Now we can launch the Android framework.
+# /init.android is the android "/init" executable,
+# which reads /init.rc to launch the framework.
+#
+# We have found that udev and android's processes
+# collide.  Android apparently does its own udev -like
+# thing, probably with ueventd, which is a symlink
+# to /init.android.  This "udev" collision needs to
+# be explored.  But currently, if you kill off udev
+# before running /init.android, things *seem* to be
+# working reasonably well.
+#
+
+# fix_log
+# Logging is not quite right.  Looks like the G2 kernel is
+# creating /dev/log as a file.  But Android wants /dev/log/main
+# and a few other files there.  Seems it creates /dev/log_main
+# instead (because /dev/log is already there?).  The "fix" for
+# now is the following function.  It makes /system/bin/logcat
+# work, which is very useful for debug.
+#
+fix_log() {
+  if [ ! -d /dev/log ]; then
+      rm -f /dev/log
+      mkdir /dev/log
+      ln -s /dev/log_main   /dev/log/main
+      ln -s /dev/log_system /dev/log/system
+      ln -s /dev/log_radio  /dev/log/radio
+      ln -s /dev/log_events /dev/log/events
+  fi
+}
+
+start() {
+  killall udevd
+  fix_log
+  chmod oug+rw /dev/binder
+  chmod oug+rw /dev/fb0
+  rm -f /dev/graphics/fb0
+  chmod oug+rw /dev/tty0
+  chmod oug+rw /dev/ashmem
+  chmod oug+rw /dev/input/*
+  /init.android &
+}
+
+stop() {
+  killall init.android
+}

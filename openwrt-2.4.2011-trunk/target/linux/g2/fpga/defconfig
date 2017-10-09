@@ -1,0 +1,10 @@
+# Non-package opwnwrt .config stuff to add for this board,
+# for all profiles.  
+CONFIG_BUSYBOX_CONFIG_RESIZE=y
+CONFIG_BUSYBOX_CONFIG_GETTY=y
+CONFIG_BUSYBOX_CONFIG_LOGIN=y
+
+# Defaults for the LCD in FPGA mode
+CONFIG_PACKAGE_kmod-g2-lcd-aclkfpga=y
+CONFIG_PACKAGE_kmod-g2-lcd-rgbfpga=y
+CONFIG_PACKAGE_hotplug2=n

@@ -1,0 +1,17 @@
+This board build requires just a bit of bootstrapping before you can "make".
+
+make board=ms profile=media-server images=hd toolchain=ms prepare
+cd openwrt-2.4.2011-trunk
+./scripts/feeds install mythtv
+sh package/feeds/cortina/mythtv/feeds-install.sh
+cd ../
+make board=ms profile=media-server images=hd toolchain=ms reconfig
+make
+
+** NOTE: as of July 28th, 2011, the dvb-core changes made by the
+driver folks to get the Cortina TS driver working w/out a frontend
+breaks the normal dvb drivers we use with MythTV, so REMOVE IT!
+
+  rm -rf openwrt-2.4.2011-trunk/target/linux/g2/files/drivers/media/dvb/dvb-core/
+
+******************************************************************

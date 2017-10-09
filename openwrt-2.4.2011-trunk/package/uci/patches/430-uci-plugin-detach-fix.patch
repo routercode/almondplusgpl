@@ -1,0 +1,45 @@
+--- uci-12012009.5-old/libuci.c	2012-11-28 19:37:50.000000000 +0800
++++ uci-12012009.5-new/libuci.c	2012-12-10 13:15:59.000000000 +0800
+@@ -90,7 +90,8 @@
+ 		uci_free_element(e);
+ 	}
+ 	UCI_TRAP_RESTORE(ctx);
+-	uci_foreach_element_safe(&ctx->root, tmp, e) {
++	/* fix bug: assign to the correct plugins list */
++	uci_foreach_element_safe(&ctx->plugins/*&ctx->root*/, tmp, e) {
+ 		uci_unload_plugin(ctx, uci_to_plugin(e));
+ 	}
+ 	free(ctx);
+--- uci-12012009.5-old/trigger/uci_trigger.c	2012-11-28 19:37:50.000000000 +0800
++++ uci-12012009.5-new/trigger/uci_trigger.c	2012-12-10 13:20:48.000000000 +0800
+@@ -119,7 +119,9 @@
+ static void trigger_detach(struct uci_context *ctx)
+ {
+ 	if (gL && (--refcount <= 0)) {
++#if 0 /* it will cause segmentation fault, mark off temporarily */
+ 		lua_close(gL);
++#endif
+ 		gL = NULL;
+ 		refcount = 0;
+ 		prepared = false;
+--- uci-12012009.5-old/../../../package/uci/trigger/modules/base.lua	2013-03-05 19:04:40.000000000 +0800
++++ uci-12012009.5-old/../../../package/uci/trigger/modules/base.lua	2013-03-07 13:30:08.000000000 +0800
+@@ -59,5 +59,18 @@
+ 		action = uci.trigger.system_command("wifi"),
+ 		belongs_to = "network_restart"
+ 	},
++	{
++		id = "tr069_restart",
++		title = "Restart tr069",
++		package = "tr098",
++		section = { "ManagementServer" },
++		action = uci.trigger.service_restart("tr069")
++	},
++	{
++		id = "ethport_restart",
++		title = "Restart ethport",
++		package = "ethport",
++		action = uci.trigger.service_restart("ethport")
++	},
+ }
+ 

@@ -1,0 +1,61 @@
+diff -Naur linux-2.6.36/drivers/amba/bus.c linux-2.6.36-new/drivers/amba/bus.c
+--- linux-2.6.36/drivers/amba/bus.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/amba/bus.c	2011-09-04 11:07:57.000000000 -0700
+@@ -159,15 +159,19 @@
+ 	int ret;
+ 
+ 	do {
+-		ret = amba_get_enable_pclk(pcdev);
++#if !defined(CONFIG_FB_CS752X_CLCD_NO_AMBA_PCLK)
++		ret = amba_get_enable_pclk(pcdev);  
+ 		if (ret)
+ 			break;
++#endif
+ 
+ 		ret = pcdrv->probe(pcdev, id);
+ 		if (ret == 0)
+ 			break;
+ 
+-		amba_put_disable_pclk(pcdev);
++#if !defined(CONFIG_FB_CS752X_CLCD_NO_AMBA_PCLK)
++		amba_put_disable_pclk(pcdev);  
++#endif
+ 	} while (0);
+ 
+ 	return ret;
+@@ -179,7 +183,9 @@
+ 	struct amba_driver *drv = to_amba_driver(dev->driver);
+ 	int ret = drv->remove(pcdev);
+ 
++#if !defined(CONFIG_FB_CS752X_CLCD_NO_AMBA_PCLK)
+ 	amba_put_disable_pclk(pcdev);
++#endif
+ 
+ 	return ret;
+ }
+@@ -281,9 +287,14 @@
+ 		goto err_release;
+ 	}
+ 
++#if !defined(CONFIG_FB_CS752X_CLCD_NO_AMBA_PCLK)
+ 	ret = amba_get_enable_pclk(dev);
++#else
++	ret = 0;
++#endif
+ 	if (ret == 0) {
+ 		u32 pid, cid;
++    
+ 
+ 		/*
+ 		 * Read pid and cid based on size of resource
+@@ -296,7 +307,9 @@
+ 			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
+ 				(i * 8);
+ 
+-		amba_put_disable_pclk(dev);
++#if !defined(CONFIG_FB_CS752X_CLCD_NO_AMBA_PCLK)
++		amba_put_disable_pclk(dev); 
++#endif
+ 
+ 		if (cid == 0xb105f00d)
+ 			dev->periphid = pid;

@@ -1,0 +1,38 @@
+#!/bin/sh
+# Copyright (C) 2006 OpenWrt.org
+
+run_scripts() {
+	for i in /etc/rc.d/$1*; do
+		[ -x $i ] && $i $2 2>&1
+	done | $LOGGER
+}
+
+system_config() {
+	config_get_bool foreground $1 foreground 0
+}
+
+
+HOME=/
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/hddapp/bin:/usr/hddapp/sbin:/usr/local/bin:/usr/local/sbin
+export HOME PATH
+
+echo "Mounting proc filesystem..."
+mount -n -t proc /proc /proc
+
+if [ `/bin/date +%Y` -lt 2009 ]; then
+/bin/date 010112002009
+fi
+
+LOGGER="cat"
+[ -x /usr/bin/logger ] && LOGGER="logger -s -p 6 -t sysinit"
+
+. /etc/functions.sh
+
+config_load system
+config_foreach system_config system
+
+if [ "$1" = "S" -a "$foreground" != "1" ]; then
+	run_scripts "$1" "$2" &
+else
+	run_scripts "$1" "$2"
+fi

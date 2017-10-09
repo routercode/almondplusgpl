@@ -1,0 +1,11 @@
+diff -Naur uci-12012009.5-old/uci.h uci-12012009.5-new/uci.h
+--- uci-12012009.5-old/uci.h	2010-03-23 07:38:00.000000000 -0700
++++ uci-12012009.5-new/uci.h	2010-09-11 13:12:01.000000000 -0700
+@@ -478,6 +478,7 @@
+ struct uci_hook_ops
+ {
+ 	void (*load)(const struct uci_hook_ops *ops, struct uci_package *p);
++	void (*commit)(const struct uci_hook_ops *ops, struct uci_package *p);
+ 	void (*set)(const struct uci_hook_ops *ops, struct uci_package *p, struct uci_delta *e);
+ };
+ 

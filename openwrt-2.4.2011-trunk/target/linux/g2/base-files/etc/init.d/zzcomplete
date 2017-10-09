@@ -1,0 +1,8 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+start() {
+  [ -x /bin/psplash-write ] && /bin/psplash-write "MSG Ready!"
+}
+

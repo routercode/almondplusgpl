@@ -1,0 +1,22 @@
+--- linux-2.6.36/drivers/staging/android/Kconfig~	2011-08-31 09:41:29.941209243 -0700
++++ linux-2.6.36/drivers/staging/android/Kconfig	2011-08-31 13:06:15.473607747 -0700
+@@ -3,6 +3,19 @@
+ config ANDROID
+ 	bool "Android Drivers"
+ 	default N
++	select FB
++	select FB_CFB_COPYAREA
++	select FB_CFB_FILLRECT
++	select FB_CFB_IMAGEBLIT
++	select FB_SYS_COPYAREA
++	select FB_SYS_FILLRECT
++	select FB_SYS_IMAGEBLIT
++	select FB_DEFERRED_IO
++	select FB_TILEBLITTING
++	select FB_MODE_HELPERS
++	select FONT_8x16
++	select FONT_8x8
++	select VIDEO_OUTPUT_CONTROL
+ 	---help---
+ 	  Enable support for various drivers needed on the Android platform
+ 

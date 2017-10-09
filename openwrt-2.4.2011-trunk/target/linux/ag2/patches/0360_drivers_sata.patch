@@ -1,0 +1,106 @@
+diff -Naur linux-2.6.36/drivers/ata/libata-core.c linux-2.6.36-new/drivers/ata/libata-core.c
+--- linux-2.6.36/drivers/ata/libata-core.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/ata/libata-core.c	2011-09-04 11:06:14.000000000 -0700
+@@ -93,6 +93,8 @@
+ static unsigned int ata_dev_set_xfermode(struct ata_device *dev);
+ static unsigned int ata_dev_set_feature(struct ata_device *dev,
+ 					u8 enable, u8 feature);
++static unsigned int ata_dev_set_feature_timeout(struct ata_device *dev,
++	       				u8 enable, u8 feature, u16 timeout);
+ static void ata_dev_xfermask(struct ata_device *dev);
+ static unsigned long ata_dev_blacklisted(const struct ata_device *dev);
+ 
+@@ -2158,7 +2160,7 @@
+ 		 * SET_FEATURES spin-up subcommand before it will accept
+ 		 * anything other than the original IDENTIFY command.
+ 		 */
+-		err_mask = ata_dev_set_feature(dev, SETFEATURES_SPINUP, 0);
++		err_mask = ata_dev_set_feature_timeout(dev, SETFEATURES_SPINUP, 0, 20000);
+ 		if (err_mask && id[2] != 0x738c) {
+ 			rc = -EIO;
+ 			reason = "SPINUP failed";
+@@ -4551,6 +4553,31 @@
+ 	DPRINTK("EXIT, err_mask=%x\n", err_mask);
+ 	return err_mask;
+ }
++
++static unsigned int ata_dev_set_feature_timeout(struct ata_device *dev, u8 enable,
++					u8 feature, u16 timeout)
++{
++	struct ata_taskfile tf;
++	unsigned int err_mask;
++
++	/* set up set-features taskfile */
++	DPRINTK("set features - SATA features\n");
++
++	ata_tf_init(dev, &tf);
++	tf.command = ATA_CMD_SET_FEATURES;
++	tf.feature = enable;
++	tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
++	tf.protocol = ATA_PROT_NODATA;
++	tf.nsect = feature;
++
++
++	err_mask = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0, timeout);
++
++	DPRINTK("EXIT, err_mask=%x\n", err_mask);
++	return err_mask;
++}
++
++
+ /**
+  *	ata_dev_set_feature - Issue SET FEATURES - SATA FEATURES
+  *	@dev: Device to which command will be sent
+@@ -4569,24 +4596,11 @@
+ static unsigned int ata_dev_set_feature(struct ata_device *dev, u8 enable,
+ 					u8 feature)
+ {
+-	struct ata_taskfile tf;
+-	unsigned int err_mask;
++	return ata_dev_set_feature_timeout( dev, enable, feature, 0);
++}
+ 
+-	/* set up set-features taskfile */
+-	DPRINTK("set features - SATA features\n");
+ 
+-	ata_tf_init(dev, &tf);
+-	tf.command = ATA_CMD_SET_FEATURES;
+-	tf.feature = enable;
+-	tf.flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
+-	tf.protocol = ATA_PROT_NODATA;
+-	tf.nsect = feature;
+ 
+-	err_mask = ata_exec_internal(dev, &tf, NULL, DMA_NONE, NULL, 0, 0);
+-
+-	DPRINTK("EXIT, err_mask=%x\n", err_mask);
+-	return err_mask;
+-}
+ 
+ /**
+  *	ata_dev_init_params - Issue INIT DEV PARAMS command
+diff -Naur linux-2.6.36/drivers/ata/libata-scsi.c linux-2.6.36-new/drivers/ata/libata-scsi.c
+--- linux-2.6.36/drivers/ata/libata-scsi.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/ata/libata-scsi.c	2011-09-04 11:06:15.000000000 -0700
+@@ -1147,7 +1147,7 @@
+ 			return -ENOMEM;
+ 		}
+ 
+-		blk_queue_dma_drain(q, atapi_drain_needed, buf, ATAPI_MAX_DRAIN);
++		blk_queue_dma_drain(q, atapi_drain_needed, buf, 0);
+ 	} else {
+ 		/* ATA devices must be sector aligned */
+ 		blk_queue_update_dma_alignment(sdev->request_queue,
+diff -Naur linux-2.6.36/drivers/ata/sata_sil24.c linux-2.6.36-new/drivers/ata/sata_sil24.c
+--- linux-2.6.36/drivers/ata/sata_sil24.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/ata/sata_sil24.c	2011-09-04 11:06:14.000000000 -0700
+@@ -1346,7 +1346,9 @@
+ 	/* Set max read request size to 4096.  This slightly increases
+ 	 * write throughput for pci-e variants.
+ 	 */
+-	pcie_set_readrq(pdev, 4096);
++	//debug_Aaron
++	//pcie_set_readrq(pdev, 4096);
++	pcie_set_readrq(pdev, 512);
+ 
+ 	sil24_init_controller(host);
+ 

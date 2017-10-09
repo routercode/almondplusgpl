@@ -1,0 +1,679 @@
+Archive member included because of file (symbol)
+
+/mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+                              /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o (__libc_csu_fini)
+
+Allocating common symbols
+Common symbol       size              file
+
+Para                0x70              ne_cfg.o
+
+Discarded input sections
+
+ .note.GNU-stack
+                0x00000000        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+ .note.GNU-stack
+                0x00000000        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+ .note.GNU-stack
+                0x00000000        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+ .note.GNU-stack
+                0x00000000        0x0 ne_cfg.o
+ .note.GNU-stack
+                0x00000000        0x0 parser.o
+ .note.GNU-stack
+                0x00000000        0x0 ne_ipc.o
+ .note.GNU-stack
+                0x00000000        0x0 ni/ni.o
+ .note.GNU-stack
+                0x00000000        0x0 fe/fe.o
+ .note.GNU-stack
+                0x00000000        0x0 tm/tm.o
+ .note.GNU-stack
+                0x00000000        0x0 sch/sch.o
+ .note.GNU-stack
+                0x00000000        0x0 qm/qm.o
+ .note.GNU-stack
+                0x00000000        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+ .note.GNU-stack
+                0x00000000        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtend.o
+ .note.GNU-stack
+                0x00000000        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crtn.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+LOAD ne_cfg.o
+LOAD parser.o
+LOAD ne_ipc.o
+LOAD ni/ni.o
+LOAD fe/fe.o
+LOAD tm/tm.o
+LOAD sch/sch.o
+LOAD qm/qm.o
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/libgcc.a
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc.so
+START GROUP
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/lib/libc.so.6
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/lib/ld-linux.so.3
+END GROUP
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/libgcc.a
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtend.o
+LOAD /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crtn.o
+                0x00008000                PROVIDE (__executable_start, 0x8000)
+                0x00008154                . = (0x8000 + SIZEOF_HEADERS)
+
+.interp         0x00008154       0x13
+ *(.interp)
+ .interp        0x00008154       0x13 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+
+.note.ABI-tag   0x00008168       0x20
+ .note.ABI-tag  0x00008168       0x20 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+
+.note.gnu.build-id
+ *(.note.gnu.build-id)
+
+.hash           0x00008188       0xa0
+ *(.hash)
+ .hash          0x00008188       0xa0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+
+.gnu.hash
+ *(.gnu.hash)
+
+.dynsym         0x00008228      0x150
+ *(.dynsym)
+ .dynsym        0x00008228      0x150 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+
+.dynstr         0x00008378       0xb0
+ *(.dynstr)
+ .dynstr        0x00008378       0xb0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+
+.gnu.version    0x00008428       0x2a
+ *(.gnu.version)
+ .gnu.version   0x00008428       0x2a /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+
+.gnu.version_d  0x00008454        0x0 load address 0x00008452
+ *(.gnu.version_d)
+ .gnu.version_d
+                0x00000000        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+
+.gnu.version_r  0x00008454       0x20
+ *(.gnu.version_r)
+ .gnu.version_r
+                0x00008454       0x20 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+
+.rel.dyn        0x00008474       0x20
+ *(.rel.init)
+ *(.rel.text .rel.text.* .rel.gnu.linkonce.t.*)
+ *(.rel.fini)
+ *(.rel.rodata .rel.rodata.* .rel.gnu.linkonce.r.*)
+ *(.rel.data.rel.ro* .rel.gnu.linkonce.d.rel.ro.*)
+ *(.rel.data .rel.data.* .rel.gnu.linkonce.d.*)
+ *(.rel.tdata .rel.tdata.* .rel.gnu.linkonce.td.*)
+ *(.rel.tbss .rel.tbss.* .rel.gnu.linkonce.tb.*)
+ *(.rel.ctors)
+ *(.rel.dtors)
+ *(.rel.got)
+ .rel.got       0x00008474        0x8 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+ *(.rel.bss .rel.bss.* .rel.gnu.linkonce.b.*)
+ .rel.bss       0x0000847c       0x18 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+                0x00008494                PROVIDE (__rel_iplt_start, .)
+ *(.rel.iplt)
+                0x00008494                PROVIDE (__rel_iplt_end, .)
+                0x00008494                PROVIDE (__rela_iplt_start, .)
+                0x00008494                PROVIDE (__rela_iplt_end, .)
+
+.rela.dyn       0x00008494        0x0
+ *(.rela.init)
+ *(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
+ *(.rela.fini)
+ *(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
+ *(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
+ *(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
+ *(.rela.tbss .rela.tbss.* .rela.gnu.linkonce.tb.*)
+ *(.rela.ctors)
+ *(.rela.dtors)
+ *(.rela.got)
+ *(.rela.bss .rela.bss.* .rela.gnu.linkonce.b.*)
+                0x00008494                PROVIDE (__rel_iplt_start, .)
+                0x00008494                PROVIDE (__rel_iplt_end, .)
+                0x00008494                PROVIDE (__rela_iplt_start, .)
+ *(.rela.iplt)
+                0x00008494                PROVIDE (__rela_iplt_end, .)
+
+.rel.plt        0x00008494       0x88
+ *(.rel.plt)
+ .rel.plt       0x00008494       0x88 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+
+.rela.plt
+ *(.rela.plt)
+
+.init           0x0000851c        0xc
+ *(.init)
+ .init          0x0000851c        0x8 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+                0x0000851c                _init
+ .init          0x00008524        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crtn.o
+
+.plt            0x00008528       0xe0
+ *(.plt)
+ .plt           0x00008528       0xe0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+                0x0000853c                abort@@GLIBC_2.4
+                0x00008548                __libc_start_main@@GLIBC_2.4
+                0x00008560                inet_addr@@GLIBC_2.4
+                0x0000856c                sendto@@GLIBC_2.4
+                0x00008578                memset@@GLIBC_2.4
+                0x00008584                socket@@GLIBC_2.4
+                0x00008590                getopt@@GLIBC_2.4
+                0x0000859c                strtoul@@GLIBC_2.4
+                0x000085a8                strcpy@@GLIBC_2.4
+                0x000085b4                printf@@GLIBC_2.4
+                0x000085c0                select@@GLIBC_2.4
+                0x000085cc                close@@GLIBC_2.4
+                0x000085d8                fprintf@@GLIBC_2.4
+                0x000085e4                puts@@GLIBC_2.4
+                0x000085f0                recvfrom@@GLIBC_2.4
+                0x000085fc                strcmp@@GLIBC_2.4
+
+.iplt
+ *(.iplt)
+
+.text           0x00008608      0xb04
+ *(.text.unlikely .text.*_unlikely)
+ *(.text .stub .text.* .gnu.linkonce.t.*)
+ .text          0x00008608       0x3c /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+                0x00008608                _start
+ .text          0x00008644       0x24 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+ .text          0x00008668       0x4c /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+ .text          0x000086b4      0x10c ne_cfg.o
+                0x000086b4                main
+ .text          0x000087c0      0x3a0 parser.o
+                0x000087c0                ParserOpt
+ .text          0x00008b60      0x158 ne_ipc.o
+                0x00008b60                SendCommand
+ .text          0x00008cb8       0x18 ni/ni.o
+                0x00008cb8                necfg_ni_mod
+ .text          0x00008cd0      0x388 fe/fe.o
+                0x00008cd0                CheckParas
+                0x00008e84                necfg_fe_mod
+                0x00008f8c                PrintParas
+ .text          0x00009058       0x18 tm/tm.o
+                0x00009058                necfg_tm_mod
+ .text          0x00009070       0x18 sch/sch.o
+                0x00009070                necfg_sch_mod
+ .text          0x00009088       0x18 qm/qm.o
+                0x00009088                necfg_qm_mod
+ .text          0x000090a0       0x6c /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+                0x000090a0                __libc_csu_fini
+                0x000090a4                __libc_csu_init
+ .text          0x0000910c        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtend.o
+ .text          0x0000910c        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crtn.o
+ *(.gnu.warning)
+ *(.glue_7t)
+ .glue_7t       0x00000000        0x0 linker stubs
+ *(.glue_7)
+ .glue_7        0x00000000        0x0 linker stubs
+ *(.vfp11_veneer)
+ .vfp11_veneer  0x00000000        0x0 linker stubs
+ *(.v4_bx)
+ .v4_bx         0x00000000        0x0 linker stubs
+
+.fini           0x0000910c        0x8
+ *(.fini)
+ .fini          0x0000910c        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+                0x0000910c                _fini
+ .fini          0x00009110        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crtn.o
+                0x00009114                PROVIDE (__etext, .)
+                0x00009114                PROVIDE (_etext, .)
+                0x00009114                PROVIDE (etext, .)
+
+.rodata         0x00009114      0x76c
+ *(.rodata .rodata.* .gnu.linkonce.r.*)
+ .rodata.cst4   0x00009114        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+                0x00009114                _IO_stdin_used
+ .rodata        0x00009118      0x22c ne_cfg.o
+ .rodata.str1.4
+                0x00009344       0x13 ne_cfg.o
+                                 0x14 (size before relaxing)
+ *fill*         0x00009357        0x1 00
+ .rodata.str1.4
+                0x00009358       0x10 parser.o
+ .rodata.str1.4
+                0x00009368       0x1e ne_ipc.o
+                                 0x20 (size before relaxing)
+ *fill*         0x00009386        0x2 00
+ .rodata.str1.4
+                0x00009388       0x1c ni/ni.o
+ .rodata        0x000093a4      0x320 fe/fe.o
+ .rodata.str1.4
+                0x000096c4      0x1bc fe/fe.o
+ .rodata.str1.4
+                0x00000000       0x1c tm/tm.o
+ .rodata.str1.4
+                0x00000000       0x1c sch/sch.o
+ .rodata.str1.4
+                0x00000000       0x1c qm/qm.o
+
+.rodata1
+ *(.rodata1)
+
+.ARM.extab      0x00009880        0x0
+ *(.ARM.extab* .gnu.linkonce.armextab.*)
+ .ARM.extab     0x00009880        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+                0x00009880                __exidx_start = .
+
+.ARM.exidx      0x00009880        0x8
+ *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+ .ARM.exidx     0x00009880        0x8 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+                0x00009888                __exidx_end = .
+
+.eh_frame_hdr   0x00009888       0x6c
+ *(.eh_frame_hdr)
+ .eh_frame_hdr  0x00009888       0x6c ne_cfg.o
+
+.eh_frame       0x000098f4      0x1a0
+ *(.eh_frame)
+ .eh_frame      0x000098f4       0x40 ne_cfg.o
+ .eh_frame      0x00009934       0x2c parser.o
+                                 0x40 (size before relaxing)
+ .eh_frame      0x00009960       0x28 ne_ipc.o
+                                 0x3c (size before relaxing)
+ .eh_frame      0x00009988       0x1c ni/ni.o
+                                 0x30 (size before relaxing)
+ .eh_frame      0x000099a4       0x5c fe/fe.o
+                                 0x70 (size before relaxing)
+ .eh_frame      0x00009a00       0x1c tm/tm.o
+                                 0x30 (size before relaxing)
+ .eh_frame      0x00009a1c       0x1c sch/sch.o
+                                 0x30 (size before relaxing)
+ .eh_frame      0x00009a38       0x1c qm/qm.o
+                                 0x30 (size before relaxing)
+ .eh_frame      0x00009a54       0x3c /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+                                 0x50 (size before relaxing)
+ .eh_frame      0x00009a90        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtend.o
+
+.gcc_except_table
+ *(.gcc_except_table .gcc_except_table.*)
+                0x00009a94                . = (ALIGN (0x8000) - ((0x8000 - .) & 0x7fff))
+                0x00011a94                . = (0x8000 DATA_SEGMENT_ALIGN 0x1000)
+
+.eh_frame
+ *(.eh_frame)
+
+.gcc_except_table
+ *(.gcc_except_table .gcc_except_table.*)
+
+.tdata
+ *(.tdata .tdata.* .gnu.linkonce.td.*)
+
+.tbss
+ *(.tbss .tbss.* .gnu.linkonce.tb.*)
+ *(.tcommon)
+
+.preinit_array  0x00011a94        0x0
+                0x00011a94                PROVIDE (__preinit_array_start, .)
+ *(.preinit_array)
+                0x00011a94                PROVIDE (__preinit_array_end, .)
+
+.init_array     0x00011a94        0x4
+                0x00011a94                PROVIDE (__init_array_start, .)
+ *(SORT(.init_array.*))
+ *(.init_array)
+ .init_array    0x00011a94        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+                0x00011a98                PROVIDE (__init_array_end, .)
+
+.fini_array     0x00011a98        0x4
+                0x00011a98                PROVIDE (__fini_array_start, .)
+ *(.fini_array)
+ .fini_array    0x00011a98        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+ *(SORT(.fini_array.*))
+                0x00011a9c                PROVIDE (__fini_array_end, .)
+
+.ctors
+ *crtbegin.o(.ctors)
+ *crtbegin?.o(.ctors)
+ *(EXCLUDE_FILE(*crtend?.o *crtend.o) .ctors)
+ *(SORT(.ctors.*))
+ *(.ctors)
+
+.dtors
+ *crtbegin.o(.dtors)
+ *crtbegin?.o(.dtors)
+ *(EXCLUDE_FILE(*crtend?.o *crtend.o) .dtors)
+ *(SORT(.dtors.*))
+ *(.dtors)
+
+.jcr            0x00011a9c        0x4
+ *(.jcr)
+ .jcr           0x00011a9c        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+ .jcr           0x00011a9c        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtend.o
+
+.data.rel.ro
+ *(.data.rel.ro.local* .gnu.linkonce.d.rel.ro.local.*)
+ *(.data.rel.ro* .gnu.linkonce.d.rel.ro.*)
+
+.dynamic        0x00011aa0       0xe8
+ *(.dynamic)
+ .dynamic       0x00011aa0       0xe8 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+                0x00011aa0                _DYNAMIC
+                0x00011b88                . = (. DATA_SEGMENT_RELRO_END 0x0)
+
+.got            0x00011b88       0x54
+ *(.got.plt)
+ .got.plt       0x00011b88       0x50 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+                0x00011b88                _GLOBAL_OFFSET_TABLE_
+ *(.igot.plt)
+ *(.got)
+ .got           0x00011bd8        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+ *(.igot)
+
+.data           0x00011bdc       0xec
+                0x00011bdc                PROVIDE (__data_start, .)
+ *(.data .data.* .gnu.linkonce.d.*)
+ .data          0x00011bdc        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+                0x00011bdc                data_start
+                0x00011bdc                __data_start
+ .data          0x00011be0        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+ .data          0x00011be0        0x4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+                0x00011be0                __dso_handle
+ .data          0x00011be4       0x70 ne_cfg.o
+                0x00011be4                VersionInfo
+                0x00011c38                ModuleDef
+                0x00011c50                pParaInfo
+ .data          0x00011c54        0x4 parser.o
+                0x00011c54                AllOpts
+ .data          0x00011c58        0x0 ne_ipc.o
+ .data          0x00011c58        0x0 ni/ni.o
+ .data          0x00011c58       0x70 fe/fe.o
+                0x00011c58                fe_TableDef
+                0x00011cac                fe_CommandDef
+ .data          0x00011cc8        0x0 tm/tm.o
+ .data          0x00011cc8        0x0 sch/sch.o
+ .data          0x00011cc8        0x0 qm/qm.o
+ .data          0x00011cc8        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+ .data          0x00011cc8        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtend.o
+ .data          0x00011cc8        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crtn.o
+
+.data1
+ *(.data1)
+                0x00011cc8                _edata = .
+                0x00011cc8                PROVIDE (edata, .)
+                0x00011cc8                __bss_start = .
+                0x00011cc8                __bss_start__ = .
+
+.bss            0x00011cc8       0x80
+ *(.dynbss)
+ *fill*         0x00011cc8        0x0 00
+ .dynbss        0x00011cc8        0xc /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+                0x00011cc8                stderr@@GLIBC_2.4
+                0x00011ccc                optarg@@GLIBC_2.4
+                0x00011cd0                opterr@@GLIBC_2.4
+ *(.bss .bss.* .gnu.linkonce.b.*)
+ .bss           0x00011cd4        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+ .bss           0x00011cd4        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+ .bss           0x00011cd4        0x1 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+ .bss           0x00011cd5        0x0 ne_cfg.o
+ .bss           0x00011cd5        0x0 parser.o
+ .bss           0x00011cd5        0x0 ne_ipc.o
+ .bss           0x00011cd5        0x0 ni/ni.o
+ .bss           0x00011cd5        0x0 fe/fe.o
+ .bss           0x00011cd5        0x0 tm/tm.o
+ .bss           0x00011cd5        0x0 sch/sch.o
+ .bss           0x00011cd5        0x0 qm/qm.o
+ .bss           0x00011cd5        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+ .bss           0x00011cd5        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtend.o
+ .bss           0x00011cd5        0x0 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crtn.o
+ *(COMMON)
+ *fill*         0x00011cd5        0x3 00
+ COMMON         0x00011cd8       0x70 ne_cfg.o
+                0x00011cd8                Para
+                0x00011d48                . = ALIGN ((. != 0x0)?0x4:0x1)
+                0x00011d48                _bss_end__ = .
+                0x00011d48                __bss_end__ = .
+                0x00011d48                . = ALIGN (0x4)
+                0x00011d48                . = ALIGN (0x4)
+                0x00011d48                __end__ = .
+                0x00011d48                _end = .
+                0x00011d48                PROVIDE (end, .)
+                0x00011d48                . = DATA_SEGMENT_END (.)
+
+.stab
+ *(.stab)
+
+.stabstr
+ *(.stabstr)
+
+.stab.excl
+ *(.stab.excl)
+
+.stab.exclstr
+ *(.stab.exclstr)
+
+.stab.index
+ *(.stab.index)
+
+.stab.indexstr
+ *(.stab.indexstr)
+
+.ARM.attributes
+                0x00000000       0x2f
+ .ARM.attributes
+                0x00000000       0x2d /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+ .ARM.attributes
+                0x0000002d       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+ .ARM.attributes
+                0x0000005c       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+ .ARM.attributes
+                0x0000008b       0x31 ne_cfg.o
+ .ARM.attributes
+                0x000000bc       0x31 parser.o
+ .ARM.attributes
+                0x000000ed       0x31 ne_ipc.o
+ .ARM.attributes
+                0x0000011e       0x31 ni/ni.o
+ .ARM.attributes
+                0x0000014f       0x31 fe/fe.o
+ .ARM.attributes
+                0x00000180       0x31 tm/tm.o
+ .ARM.attributes
+                0x000001b1       0x31 sch/sch.o
+ .ARM.attributes
+                0x000001e2       0x31 qm/qm.o
+ .ARM.attributes
+                0x00000213       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+ .ARM.attributes
+                0x00000242       0x2d /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtend.o
+ .ARM.attributes
+                0x0000026f       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crtn.o
+
+.comment        0x00000000      0x148
+ *(.comment)
+ .comment       0x00000000       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+ .comment       0x0000002f       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crti.o
+ .comment       0x0000005e       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtbegin.o
+ .comment       0x0000008d       0x2e ne_cfg.o
+                                 0x2f (size before relaxing)
+ .comment       0x00000000       0x2f parser.o
+ .comment       0x00000000       0x2f ne_ipc.o
+ .comment       0x00000000       0x2f ni/ni.o
+ .comment       0x00000000       0x2f fe/fe.o
+ .comment       0x00000000       0x2f tm/tm.o
+ .comment       0x00000000       0x2f sch/sch.o
+ .comment       0x00000000       0x2f qm/qm.o
+ .comment       0x000000bb       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+ .comment       0x000000ea       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../lib/gcc/arm-none-linux-gnueabi/4.4.1/crtend.o
+ .comment       0x00000119       0x2f /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crtn.o
+
+.debug
+ *(.debug)
+
+.line
+ *(.line)
+
+.debug_srcinfo
+ *(.debug_srcinfo)
+
+.debug_sfnames
+ *(.debug_sfnames)
+
+.debug_aranges  0x00000000      0x120
+ *(.debug_aranges)
+ .debug_aranges
+                0x00000000       0x20 ne_cfg.o
+ .debug_aranges
+                0x00000020       0x20 parser.o
+ .debug_aranges
+                0x00000040       0x20 ne_ipc.o
+ .debug_aranges
+                0x00000060       0x20 ni/ni.o
+ .debug_aranges
+                0x00000080       0x20 fe/fe.o
+ .debug_aranges
+                0x000000a0       0x20 tm/tm.o
+ .debug_aranges
+                0x000000c0       0x20 sch/sch.o
+ .debug_aranges
+                0x000000e0       0x20 qm/qm.o
+ .debug_aranges
+                0x00000100       0x20 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+
+.debug_pubnames
+                0x00000000      0x1ed
+ *(.debug_pubnames)
+ .debug_pubnames
+                0x00000000       0x25 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+ .debug_pubnames
+                0x00000025       0x50 ne_cfg.o
+ .debug_pubnames
+                0x00000075       0x2c parser.o
+ .debug_pubnames
+                0x000000a1       0x22 ne_ipc.o
+ .debug_pubnames
+                0x000000c3       0x23 ni/ni.o
+ .debug_pubnames
+                0x000000e6       0x63 fe/fe.o
+ .debug_pubnames
+                0x00000149       0x23 tm/tm.o
+ .debug_pubnames
+                0x0000016c       0x24 sch/sch.o
+ .debug_pubnames
+                0x00000190       0x23 qm/qm.o
+ .debug_pubnames
+                0x000001b3       0x3a /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+
+.debug_info     0x00000000     0x28c1
+ *(.debug_info .gnu.linkonce.wi.*)
+ .debug_info    0x00000000       0x8d /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+ .debug_info    0x0000008d      0x6ac ne_cfg.o
+ .debug_info    0x00000739      0x6a6 parser.o
+ .debug_info    0x00000ddf      0x53f ne_ipc.o
+ .debug_info    0x0000131e      0x341 ni/ni.o
+ .debug_info    0x0000165f      0x791 fe/fe.o
+ .debug_info    0x00001df0      0x341 tm/tm.o
+ .debug_info    0x00002131      0x341 sch/sch.o
+ .debug_info    0x00002472      0x341 qm/qm.o
+ .debug_info    0x000027b3      0x10e /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+
+.debug_abbrev   0x00000000      0xa00
+ *(.debug_abbrev)
+ .debug_abbrev  0x00000000       0x4b /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+ .debug_abbrev  0x0000004b      0x17f ne_cfg.o
+ .debug_abbrev  0x000001ca      0x158 parser.o
+ .debug_abbrev  0x00000322      0x139 ne_ipc.o
+ .debug_abbrev  0x0000045b       0xe0 ni/ni.o
+ .debug_abbrev  0x0000053b      0x151 fe/fe.o
+ .debug_abbrev  0x0000068c       0xe0 tm/tm.o
+ .debug_abbrev  0x0000076c       0xe0 sch/sch.o
+ .debug_abbrev  0x0000084c       0xe0 qm/qm.o
+ .debug_abbrev  0x0000092c       0xd4 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+
+.debug_line     0x00000000     0x102c
+ *(.debug_line)
+ .debug_line    0x00000000       0x27 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+ .debug_line    0x00000027      0x1d0 ne_cfg.o
+ .debug_line    0x000001f7      0x235 parser.o
+ .debug_line    0x0000042c      0x2d2 ne_ipc.o
+ .debug_line    0x000006fe      0x196 ni/ni.o
+ .debug_line    0x00000894      0x22e fe/fe.o
+ .debug_line    0x00000ac2      0x196 tm/tm.o
+ .debug_line    0x00000c58      0x198 sch/sch.o
+ .debug_line    0x00000df0      0x196 qm/qm.o
+ .debug_line    0x00000f86       0xa6 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+
+.debug_frame
+ *(.debug_frame)
+
+.debug_str      0x00000000      0xe6e
+ *(.debug_str)
+ .debug_str     0x00000000       0xa7 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/crt1.o
+                                 0xe7 (size before relaxing)
+ .debug_str     0x000000a7      0x500 ne_cfg.o
+                                0x5a9 (size before relaxing)
+ .debug_str     0x000005a7      0x437 parser.o
+                                0x97c (size before relaxing)
+ .debug_str     0x000009de      0x192 ne_ipc.o
+                                0x3fa (size before relaxing)
+ .debug_str     0x00000b70       0x15 ni/ni.o
+                                0x27a (size before relaxing)
+ .debug_str     0x00000b85      0x24e fe/fe.o
+                                0x880 (size before relaxing)
+ .debug_str     0x00000dd3       0x15 tm/tm.o
+                                0x27a (size before relaxing)
+ .debug_str     0x00000de8       0x18 sch/sch.o
+                                0x27d (size before relaxing)
+ .debug_str     0x00000e00       0x15 qm/qm.o
+                                0x27a (size before relaxing)
+ .debug_str     0x00000e15       0x59 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+                                 0xc4 (size before relaxing)
+
+.debug_loc      0x00000000      0x52d
+ *(.debug_loc)
+ .debug_loc     0x00000000       0xe2 ne_cfg.o
+ .debug_loc     0x000000e2       0xe0 parser.o
+ .debug_loc     0x000001c2       0xbb ne_ipc.o
+ .debug_loc     0x0000027d       0x45 ni/ni.o
+ .debug_loc     0x000002c2      0x123 fe/fe.o
+ .debug_loc     0x000003e5       0x45 tm/tm.o
+ .debug_loc     0x0000042a       0x45 sch/sch.o
+ .debug_loc     0x0000046f       0x45 qm/qm.o
+ .debug_loc     0x000004b4       0x79 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+
+.debug_macinfo
+ *(.debug_macinfo)
+
+.debug_weaknames
+ *(.debug_weaknames)
+
+.debug_funcnames
+ *(.debug_funcnames)
+
+.debug_typenames
+ *(.debug_typenames)
+
+.debug_varnames
+ *(.debug_varnames)
+
+.debug_pubtypes
+ *(.debug_pubtypes)
+
+.debug_ranges   0x00000000       0x18
+ *(.debug_ranges)
+ .debug_ranges  0x00000000       0x18 /mnt/swhome/aaron/G2_BSP/opt/cortina/linux/install/bin/../arm-none-linux-gnueabi/libc/usr/lib/libc_nonshared.a(elf-init.oS)
+
+.gnu.attributes
+ *(.gnu.attributes)
+
+.note.gnu.arm.ident
+ *(.note.gnu.arm.ident)
+
+/DISCARD/
+ *(.note.GNU-stack)
+ *(.gnu_debuglink)
+ *(.gnu.lto_*)
+OUTPUT(../bin/ne_cfg elf32-littlearm)

@@ -1,0 +1,61 @@
+diff -Naur linux-2.6.36/include/net/act_api.h linux-2.6.36-new/include/net/act_api.h
+--- linux-2.6.36/include/net/act_api.h	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/include/net/act_api.h	2011-09-04 11:05:38.000000000 -0700
+@@ -46,6 +46,9 @@
+ 	psched_time_t		tcfp_t_c;
+ 	struct qdisc_rate_table	*tcfp_R_tab;
+ 	struct qdisc_rate_table	*tcfp_P_tab;
++#ifdef CONFIG_CS752X_HW_ACCELERATION
++	u8			hw_pol_id;
++#endif
+ };
+ #define to_police(pc)	\
+ 	container_of(pc, struct tcf_police, common)
+diff -Naur linux-2.6.36/include/net/sch_generic.h linux-2.6.36-new/include/net/sch_generic.h
+--- linux-2.6.36/include/net/sch_generic.h	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/include/net/sch_generic.h	2011-09-04 11:05:38.000000000 -0700
+@@ -9,12 +9,15 @@
+ #include <linux/pkt_cls.h>
+ #include <net/gen_stats.h>
+ #include <net/rtnetlink.h>
++#include <mach/hw_accel.h>
+ 
+ struct Qdisc_ops;
+ struct qdisc_walker;
+ struct tcf_walker;
+ struct module;
+ 
++/* Cortina Acceleration Jump Table */
++//extern struct cs_kernel_hw_accel_jt hw_jt;
+ struct qdisc_rate_table {
+ 	struct tc_ratespec rate;
+ 	u32		data[256];
+@@ -80,6 +83,13 @@
+ 	struct gnet_stats_basic_packed bstats;
+ 	unsigned long		__state;
+ 	struct gnet_stats_queue	qstats;
++	/*
++	 * Cortina Hardware Accel
++	 */
++	u8					cs_handle;
++#define CS_QOS_IS_MULTIQ	(1 << 7)
++#define CS_QOS_HWQ_MAP		(1 << 6)
++
+ 	struct rcu_head		rcu_head;
+ 	spinlock_t		busylock;
+ };
+@@ -417,6 +427,14 @@
+ 	if (sch->stab)
+ 		qdisc_calculate_pkt_len(skb, sch->stab);
+ #endif
++#if 0
++	/* Cortina Acceleration
++	 * Check if this skb is enqueuing into MultiQ, if not, then this skb 
++	 * cannot be hardware accelerated by flow-based definition. */
++	if (!(CS_QOS_IS_MULTIQ & sch->cs_handle)) {
++		(* hw_jt.cs_qos_set_skb_sw_only)(skb);
++	}
++#endif  
+ 	return sch->enqueue(skb, sch);
+ }
+ 

@@ -1,0 +1,74 @@
+Cortina Packet Description File
+// The keyword "Cortina Packet Description File" must be present at row 1, column 1
+// version: 0.0.1
+
+
+// 0 -------------------------------------------------------------------------
+Begin Packet: 
+	PacketType:		L4	
+	PacketLength:    	60
+	PacketNumber:		1
+	L2: 			Ethernet-II
+		DA:		ff:ff:ff:ff:ff:ff
+		SA:		00:11:22:33:44:00
+		EtherType:	0x800
+	L2: end 
+	L3: 			IPV4
+		SIP:		192.168.2.0
+		DIP:		192.168.0.0
+		ID		4567
+		TOS		127
+		TTL		4
+	//	protocol	6		// TCP
+		chksum		1		// 1: do check sum, 0: no chksum
+	L3: end 
+	L4:  			UDP
+		Sport:		23		// random
+		Dport:		80
+		chksum		1		// 1: do check sum, 0: no chksum
+	L4: end 
+	PAYLOAD:		Random
+	Signature:	begin
+		SRC_PID:	0     //source port id 0,1,2,3,4
+		DEST_PID:	0xf     //destination port id, unicast: 0,1,2,3,4
+		                  //     broadcat : 0xf
+		                  //     multicast : 0xE, look for md_pid for multicast destination port id
+		QID:		0     // Queue id : 0,1,2,3 
+		MD_PID :	0x4     //If DEST_PID = 0xE, see the value for destination
+		                  // for example id this valueis = 0b0000_0111, then port 0,1,2 will receive the packet
+	Signature : end	
+	PAYLOAD end
+End packet
+// 0 -------------------------------------------------------------------------
+Begin Packet: 
+	PacketType:		L4	
+	PacketLength:    	68
+	PacketNumber:		10
+	L2: 			802_3
+		DA:		00:11:22:33:44:11
+		SA:		00:11:22:33:44:00
+		LLC		0xaa, 0xaa, 0x03	// DSAP, SSAP, Control
+		SNAP		0x00, 0x00, 0x00	// organization	
+		EtherType:	0x800
+	L2: end 
+	L3: 			IPV4
+		SIP:		192.168.2.0
+		DIP:		192.168.0.0
+		ID		4567
+		TOS		127
+		TTL		4
+	//	protocol	6		// TCP
+		chksum		1		// 1: do check sum, 0: no chksum
+	L3: end 
+	PAYLOAD:		Random
+	Signature:	begin
+		SRC_PID:	0     //source port id 0,1,2,3,4
+		DEST_PID:	1     //destination port id, unicast: 0,1,2,3,4
+		                  //     broadcat : 0xf
+		                  //     multicast : 0xE, look for md_pid for multicast destination port id
+		QID:		0     // Queue id : 0,1,2,3 
+		MD_PID :	0x4     //If DEST_PID = 0xE, see the value for destination
+		                  // for example id this valueis = 0b0000_0111, then port 0,1,2 will receive the packet
+	Signature : end	
+	PAYLOAD end
+End packet

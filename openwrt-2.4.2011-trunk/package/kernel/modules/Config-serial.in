@@ -1,0 +1,62 @@
+menu "Configuration"
+     depends on PACKAGE_kmod-g2-mtd-serial
+
+menu "Mapping drivers for chip access"
+
+config KERNEL_MTD_CORTINA_CS752X_SERIAL_ATMEL
+    tristate "ATMEL Serial Flash device mapped on CORTINA_G2"
+    help
+      Map driver for CORTINA_G2 demo board.
+
+config KERNEL_MTD_CORTINA_CS752X_SERIAL_ST
+    tristate "ST Serial Flash device mapped on CORTINA_G2"
+    help
+      Map driver for CORTINA_G2 demo board.
+
+config KERNEL_MTD_CORTINA_CS752X_SERIAL_SPANSION
+    tristate "SPANSION Serial Flash device mapped on CORTINA_G2"
+	default y
+    help
+      Map driver for CORTINA_G2 reference board.
+
+endmenu
+
+menu "Self-contained MTD device drivers"
+
+config KERNEL_MTD_MTDRAM
+	tristate "Test driver using RAM"
+	default y
+	help
+	  This enables a test MTD device driver which uses vmalloc() to
+	  provide storage.  You probably want to say 'N' unless you're
+	  testing stuff.
+
+config KERNEL_MTDRAM_TOTAL_SIZE
+	int "MTDRAM device size in KiB"
+	default "4096"
+	help
+	  This allows you to configure the total size of the MTD device
+	  emulated by the MTDRAM driver.  If the MTDRAM driver is built
+	  as a module, it is also possible to specify this as a parameter when
+	  loading the module.
+
+config KERNEL_MTDRAM_ERASE_SIZE
+	int "MTDRAM erase block size in KiB"
+	default "128"
+	help
+	  This allows you to configure the size of the erase blocks in the
+	  device emulated by the MTDRAM driver.  If the MTDRAM driver is built
+	  as a module, it is also possible to specify this as a parameter when
+	  loading the module.
+
+config KERNEL_MTDRAM_ABS_POS
+        hex "SRAM Hexadecimal Absolute position or 0"
+        default "0"
+        help
+          If you have system RAM accessible by the CPU but not used by Linux
+          in normal operation, you can give the physical address at which the
+          available RAM starts, and the MTDRAM driver will use it instead of
+          allocating space from Linux's available memory. Otherwise, leave
+          this set to zero. Most people will want to leave this as zero.
+endmenu
+endmenu

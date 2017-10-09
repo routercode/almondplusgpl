@@ -1,0 +1,15 @@
+# 
+# /etc/inittab
+#
+# $Id: inittab,v 1.1.1.1 2011/02/07 19:20:42 peebles Exp $
+#
+
+::sysinit:/etc/init.d/rcS S boot
+::shutdown:/etc/init.d/rcS K stop
+
+::respawn:/sbin/getty -L ttyS0 115200 vt100
+
+# Stuff to do before rebooting
+::ctrlaltdel:/sbin/reboot
+::shutdown:/etc/init.d/rcS K stop
+

@@ -1,0 +1,25 @@
+setenv ethaddr $ethaddr
+setenv ethaddr1 $ethaddr1
+setenv ethaddr2 $ethaddr2
+setenv ipaddr $ipaddr
+setenv netmask $netmask
+setenv serverip $serverip
+setenv gatewayip $gatewayip
+setenv stdin serial
+setenv stdout serial
+setenv stderr serial
+setenv verify n
+setenv ethact goldengate
+setenv basicargs $basic_args $more_args
+setenv ramargs $rootfs_args
+setenv setbootargs setenv bootargs ${basicargs} ${ramargs} ethaddr0=${ethaddr} ethaddr1=${ethaddr1} ethaddr2=${ethaddr2} mtdparts=$flash_name:${mtdparts}
+setenv kernel_address $kernel_ram_cp
+setenv rootfs_address $rootfs_ram_cp
+setenv sb0_address $sb0_addr
+setenv sb1_address $sb1_addr
+setenv process sb_process ${kernel_address} ${rootfs_address} ${sb0_address} ${sb1_address}
+setenv b bootm ${kernel_address} ${rootfs_address}
+setenv bootcmd run process setbootargs b
+setenv bootdelay 5
+setenv flashfile flash.bin
+setenv reflash tftpboot 05000000 ${flashfile}; protect off all; erase all; cp.b 05000000 e0000000 ${filesize}

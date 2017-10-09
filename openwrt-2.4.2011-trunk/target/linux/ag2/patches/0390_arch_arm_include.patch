@@ -1,0 +1,142 @@
+diff -Naur linux-2.6.36/arch/arm/include/asm/dma-mapping.h linux-2.6.36-new/arch/arm/include/asm/dma-mapping.h
+--- linux-2.6.36/arch/arm/include/asm/dma-mapping.h	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/arch/arm/include/asm/dma-mapping.h	2011-09-04 11:03:58.000000000 -0700
+@@ -8,7 +8,11 @@
+ 
+ #include <asm-generic/dma-coherent.h>
+ #include <asm/memory.h>
++#include <mach/platform.h>
+ 
++#ifdef CONFIG_ACP
++extern unsigned int acp_enabled;
++#endif
+ /*
+  * page_to_dma/dma_to_virt/virt_to_dma are architecture private functions
+  * used internally by the DMA-mapping API to provide DMA addresses. They
+@@ -76,6 +80,11 @@
+ 	extern void ___dma_single_cpu_to_dev(const void *, size_t,
+ 		enum dma_data_direction);
+ 
++#ifdef CONFIG_ACP
++	if (acp_enabled == 1)
++		return;
++#endif
++
+ 	if (!arch_is_coherent())
+ 		___dma_single_cpu_to_dev(kaddr, size, dir);
+ }
+@@ -86,6 +95,10 @@
+ 	extern void ___dma_single_dev_to_cpu(const void *, size_t,
+ 		enum dma_data_direction);
+ 
++#ifdef CONFIG_ACP
++	if (acp_enabled == 1)
++		return;
++#endif
+ 	if (!arch_is_coherent())
+ 		___dma_single_dev_to_cpu(kaddr, size, dir);
+ }
+@@ -96,6 +109,10 @@
+ 	extern void ___dma_page_cpu_to_dev(struct page *, unsigned long,
+ 		size_t, enum dma_data_direction);
+ 
++#ifdef CONFIG_ACP
++	if (acp_enabled == 1)
++		return;
++#endif
+ 	if (!arch_is_coherent())
+ 		___dma_page_cpu_to_dev(page, off, size, dir);
+ }
+@@ -106,6 +123,10 @@
+ 	extern void ___dma_page_dev_to_cpu(struct page *, unsigned long,
+ 		size_t, enum dma_data_direction);
+ 
++#ifdef CONFIG_ACP
++	if (acp_enabled == 1)
++		return;
++#endif
+ 	if (!arch_is_coherent())
+ 		___dma_page_dev_to_cpu(page, off, size, dir);
+ }
+@@ -344,7 +365,11 @@
+ 
+ 	__dma_single_cpu_to_dev(cpu_addr, size, dir);
+ 
++#ifdef CONFIG_ACP
++	return virt_to_dma(dev, cpu_addr) | GOLDENGATE_ACP_BASE;
++#else
+ 	return virt_to_dma(dev, cpu_addr);
++#endif
+ }
+ 
+ /**
+@@ -368,7 +393,11 @@
+ 
+ 	__dma_page_cpu_to_dev(page, offset, size, dir);
+ 
++#ifdef CONFIG_ACP
++	return (page_to_dma(dev, page) + offset) | GOLDENGATE_ACP_BASE;
++#else
+ 	return page_to_dma(dev, page) + offset;
++#endif
+ }
+ 
+ /**
+@@ -388,7 +417,11 @@
+ static inline void dma_unmap_single(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir)
+ {
++#ifdef CONFIG_ACP
++	handle &= ~GOLDENGATE_ACP_BASE;
++#endif
+ 	__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
++
+ }
+ 
+ /**
+@@ -408,6 +441,9 @@
+ static inline void dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir)
+ {
++#ifdef CONFIG_ACP
++	handle &= ~GOLDENGATE_ACP_BASE;
++#endif
+ 	__dma_page_dev_to_cpu(dma_to_page(dev, handle), handle & ~PAGE_MASK,
+ 		size, dir);
+ }
+@@ -436,7 +472,9 @@
+ 		enum dma_data_direction dir)
+ {
+ 	BUG_ON(!valid_dma_direction(dir));
+-
++#ifdef CONFIG_ACP
++	handle &= ~GOLDENGATE_ACP_BASE;
++#endif
+ 	if (!dmabounce_sync_for_cpu(dev, handle, offset, size, dir))
+ 		return;
+ 
+@@ -448,6 +486,9 @@
+ 		enum dma_data_direction dir)
+ {
+ 	BUG_ON(!valid_dma_direction(dir));
++#ifdef CONFIG_ACP
++	handle &= ~GOLDENGATE_ACP_BASE;
++#endif
+ 
+ 	if (!dmabounce_sync_for_device(dev, handle, offset, size, dir))
+ 		return;
+diff -Naur linux-2.6.36/arch/arm/include/asm/memory.h linux-2.6.36-new/arch/arm/include/asm/memory.h
+--- linux-2.6.36/arch/arm/include/asm/memory.h	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/arch/arm/include/asm/memory.h	2011-09-04 11:03:58.000000000 -0700
+@@ -218,6 +218,11 @@
+ #define __bus_to_pfn(x)	__phys_to_pfn(x)
+ #endif
+ 
++#ifdef CONFIG_ARCH_GOLDENGATE
++#define __pfn_to_bus(x)	__pfn_to_phys(x)
++#define __bus_to_pfn(x)	__phys_to_pfn(x)
++#endif
++
+ static inline __deprecated unsigned long virt_to_bus(void *x)
+ {
+ 	return __virt_to_bus((unsigned long)x);

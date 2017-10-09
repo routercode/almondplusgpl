@@ -1,0 +1,53 @@
+Cortina Packet Description File
+
+//1. test enviornment: Ixia P0 --> LAN(eth1) <--> WAN(eth2) --> Ixia P1
+//2. cd /usr/bin/pktgen_des
+//3. pktgen -s eth1 -c eth2 -i packet_tcp.des -o packet_tcp.des
+//4. expect result: mtu=1514, CPU sent packet length = 4096 bytes, Ixia P1 receive 3 packets, 1518, 1518, 1140
+//  4176 = 1518 + 1518 + 1180
+//  Because, MAC(14) + L3 Header(20) + L4 Header(20) = 54
+//  CRC = 4
+//  4096 + 54 + 54 + (4 * 3) = 4216
+
+// The keyword "Cortina Packet Description File" must be present at row 1, column 1
+// version: 0.0.1
+
+
+// 0 -------------------------------------------------------------------------
+Begin Packet:
+        PacketType:             L4
+        PacketLength:           4096
+        PacketNumber:           1
+        L2:                     Ethernet-II
+                DA:             00:ee:ff:ff:ff:ff
+                SA:             88:11:22:33:44:99
+                EtherType:      0x800
+        L2: end
+        L3:                     IPV4
+                SIP:            192.168.2.10
+                DIP:            192.168.4.8
+                ID              4567
+                TOS             127
+                TTL             4
+                protocol        6               // TCP
+                chksum          0               // 1: do check sum, 0: no chksum
+        L3: end
+        L4:                     TCP
+                Sport:          23              // random
+                Dport:          80
+                chksum          0               // 1: do check sum, 0: no chksum
+        L4: end
+        PAYLOAD:                Sequential
+                Start:          0
+                Step:           1
+        Signature:      begin
+                SRC_PID:        1     //source port id 0,1,2,3,4
+                DEST_PID:       0xf     //destination port id, unicast: 0,1,2,3,4
+                                  //     broadcat : 0xf
+                                  //     multicast : 0xE, look for md_pid for multicast destination port id
+                QID:            2     // Queue id : 0,1,2,3
+                MD_PID :        0x3     //If DEST_PID = 0xE, see the value for destination
+                                  // for example id this valueis = 0b0000_0111, then port 0,1,2 will receive the packet
+        Signature : end
+        PAYLOAD end
+End packet

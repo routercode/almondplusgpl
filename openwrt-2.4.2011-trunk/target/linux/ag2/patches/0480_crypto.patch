@@ -1,0 +1,560 @@
+diff -Naur linux-2.6.36/crypto/tcrypt.c linux-2.6.36-new/crypto/tcrypt.c
+--- linux-2.6.36/crypto/tcrypt.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/crypto/tcrypt.c	2011-09-04 11:07:48.000000000 -0700
+@@ -29,6 +29,11 @@
+ #include "tcrypt.h"
+ #include "internal.h"
+ 
++#include <linux/crypto.h>
++#include <crypto/authenc.h>
++#include <linux/pagemap.h>
++#include <linux/rtnetlink.h>
++
+ /*
+  * Need slab memory for testing (size in number of pages).
+  */
+@@ -90,8 +95,8 @@
+ 	int ret = 0;
+ 	int i;
+ 
+-	local_bh_disable();
+-	local_irq_disable();
++	//local_bh_disable();
++	//local_irq_disable();
+ 
+ 	/* Warm-up run. */
+ 	for (i = 0; i < 4; i++) {
+@@ -122,8 +127,8 @@
+ 	}
+ 
+ out:
+-	local_irq_enable();
+-	local_bh_enable();
++	//local_irq_enable();
++	//local_bh_enable();
+ 
+ 	if (ret == 0)
+ 		printk("1 operation in %lu cycles (%d bytes)\n",
+@@ -224,6 +229,13 @@
+ 			}
+ 			b_size++;
+ 			i++;
++
++		/*int i;
++		char * p = sg_virt(sg);
++		for (i=0; i<16;i++)
++			pr_cont("%x" , *(p+i));
++		pr_cont("  \n" );
++*/
+ 		} while (*b_size);
+ 		keysize++;
+ 	} while (*keysize);
+@@ -232,6 +244,233 @@
+ 	crypto_free_blkcipher(tfm);
+ }
+ 
++struct tcrypt_result {
++	struct completion completion;
++	int err;
++};
++
++static void tcrypt_complete(struct crypto_async_request *req, int err)
++{
++	struct tcrypt_result *res = req->data;
++
++	if (err == -EINPROGRESS)
++		return;
++
++	res->err = err;
++	complete(&res->completion);
++}
++
++static inline int do_one_ahash_op(struct ahash_request *req, int ret)
++{
++	if (ret == -EINPROGRESS || ret == -EBUSY) {
++		struct tcrypt_result *tr = req->base.data;
++
++		ret = wait_for_completion_interruptible(&tr->completion);
++		if (!ret)
++			ret = tr->err;
++		INIT_COMPLETION(tr->completion);
++	}
++	return ret;
++}
++
++static inline int do_one_aead_op(struct aead_request *req, int ret)
++{
++	if (ret == -EINPROGRESS || ret == -EBUSY) {
++		struct tcrypt_result *tr = req->base.data;
++
++		ret = wait_for_completion_interruptible(&tr->completion);
++		if (!ret)
++			ret = tr->err;
++		INIT_COMPLETION(tr->completion);
++	}
++	return ret;
++}
++
++
++static int test_aead_jiffies(struct aead_request *req, int enc,
++				    int blen,  int sec)
++{
++	unsigned long start, end;
++	int bcount;
++	int ret;
++	if (sec==0)
++		sec=1;
++	for (start = jiffies, end = start + sec * HZ, bcount = 0;
++	     time_before(jiffies, end); bcount++) {
++		if (enc)
++			ret = do_one_aead_op(req,crypto_aead_encrypt(req));
++		else
++			ret = do_one_aead_op(req,crypto_aead_decrypt(req));
++	}
++
++	printk("%6u opers/sec, %9lu bytes/sec\n",
++	       bcount / sec, ((long)bcount * blen) / sec);
++
++	return 0;
++}
++
++
++static void test_aead_speed(const char *algo, unsigned int sec,
++	 struct cipher_speed_template *template, unsigned int tcount, u8 *c_keysize)
++{
++	unsigned int ret, i, j, iv_len;
++	const char *key, *pp, iv[128];
++	struct crypto_aead *tfm;
++	struct scatterlist sg[TVMEMSIZE];
++	struct tcrypt_result tresult;
++	struct aead_request *req;
++	char *input;
++	char *output;
++	int blksize = 0;
++	//int clen = 16;		/* len of data */
++	unsigned int authsize;
++	u32 *b_size;
++	struct crypto_authenc_key_param *param;
++	struct rtattr *rta;
++	char assoc[32] = "\x49\x5c\x50\x1f\x1d\x94\xcc\x81"
++				  "\xba\xb7\xb6\x03\xaf\xa5\xc1\xa1"
++				  "\xd8\x5c\x42\x68\xe0\x6c\xda\x89"
++				  "\x05\xac\x56\xac\x1b\x2a\xd3\x86";
++
++	int assoclen = 32;
++	int h_keysize=16;
++	int enc;
++
++	printk("\ntesting speed of %s \n", algo);
++
++	tfm = crypto_alloc_aead(algo, 0, 0);
++
++	if (IS_ERR(tfm)) {
++		printk("failed to load transform for %s: %ld\n", algo,
++			   PTR_ERR(tfm));
++		return;
++	}
++
++	authsize = crypto_aead_authsize(tfm);
++	iv_len = crypto_aead_ivsize(tfm);
++	blksize = ALIGN(crypto_aead_blocksize(tfm), 4);
++	input = kzalloc(9219 , GFP_KERNEL);
++	output = kzalloc(9219 , GFP_KERNEL);
++
++	req = aead_request_alloc(tfm, GFP_KERNEL);
++	if (!req) {
++		pr_err("aead request allocation failure\n");
++		goto out;
++	}
++
++	init_completion(&tresult.completion);
++	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
++				   tcrypt_complete, &tresult);
++
++	i = 0;
++	do {
++
++		b_size = block_sizes;
++		do {
++
++				if ((*c_keysize + h_keysize) > TVMEMSIZE * PAGE_SIZE) {
++						printk("template (%u) too big for "
++							   "tvmem (%lu)\n", *c_keysize + *b_size,
++							   TVMEMSIZE * PAGE_SIZE);
++						goto out;
++				}
++				int keylen = h_keysize + *c_keysize + RTA_SPACE(sizeof(*param));
++				if (keylen > TVMEMSIZE*PAGE_SIZE ) {
++						printk("keylen (%u) too big for "
++						   "tvmem (%lu)\n",keylen,
++						   TVMEMSIZE*PAGE_SIZE );
++						goto out;
++				}
++				if (iv_len > 128 ) {
++						printk("iv_len (%u) too big for "
++								   "128 \n",iv_len);
++						goto out;
++				}
++
++
++				memset(tvmem[0], 0xff, PAGE_SIZE);
++
++				memset(iv, 1, iv_len);
++				crypto_aead_clear_flags(tfm, ~0);
++				crypto_aead_set_flags(tfm, CRYPTO_TFM_REQ_WEAK_KEY);
++
++
++				pp = tvmem[0]; //key
++				rta = (void *)pp;
++				rta->rta_type = CRYPTO_AUTHENC_KEYA_PARAM;
++				rta->rta_len = RTA_LENGTH(sizeof(*param));
++				param = RTA_DATA(rta);
++				pp += RTA_SPACE(sizeof(*param));
++
++				if(h_keysize) {
++					memset(pp, i, h_keysize);
++					pp += h_keysize;
++				}
++
++				param->enckeylen = cpu_to_be32(*c_keysize);
++				memset(pp, i+1, *c_keysize);
++
++				ret = crypto_aead_setkey(tfm, tvmem[0], keylen);
++				if (ret) {
++					printk(KERN_ERR "alg: aead: Failed to set "
++						   "the key for %s\n",
++						   algo);
++					goto out;
++				}
++				ret = crypto_aead_setauthsize(tfm, authsize);
++				if (ret) {
++					printk(KERN_ERR "alg: aead: Failed to set "
++						   "authsize to %u on test for %s\n",
++						   authsize, algo);
++					goto out;
++				}
++
++				struct scatterlist src_sg, dst_sg;
++				struct scatterlist asg;
++				memset(input, 0xff, *b_size + authsize);
++				enc = ENCRYPT;
++				sg_init_one(&src_sg, input, *b_size +  (enc ? 0 : authsize));
++				sg_init_one(&dst_sg, output, *b_size +  (enc ?  authsize : 0));
++				sg_init_one(&asg, assoc, assoclen);
++
++				printk("test %u %s (cipher %d bit key, hash %d bit key, %d byte blocks): ", i,
++												enc == ENCRYPT?"encryption":"decryption",
++												*c_keysize * 8,h_keysize*8, *b_size);
++
++				aead_request_set_crypt(req, &src_sg, &dst_sg,*b_size +  (enc ? 0 : authsize), iv);
++				aead_request_set_assoc(req, &asg, assoclen);
++
++				test_aead_jiffies(req,enc,*b_size ,sec);
++
++				enc = DECRYPT;
++
++				printk("test %u %s (cipher %d bit key, hash %d bit key, %d byte blocks): ", i,
++											enc == ENCRYPT?"encryption":"decryption",
++											*c_keysize * 8,h_keysize*8, *b_size);
++				memset(input, 0xff, *b_size + authsize);
++				sg_init_one(&src_sg, output, *b_size +  (enc ? 0 : authsize));
++				sg_init_one(&dst_sg, input, *b_size +  (enc ?  authsize : 0));
++				aead_request_set_crypt(req, &src_sg, &dst_sg,*b_size +	(enc ? 0 : authsize), iv);
++				aead_request_set_assoc(req, &asg, assoclen);
++
++				test_aead_jiffies(req,enc,*b_size ,sec);
++
++			b_size++;
++			i++;
++		} while (*b_size);
++		c_keysize++;
++	} while (*c_keysize);
++
++
++out:
++	kfree(input);
++	kfree(output);
++	aead_request_free(req);
++	crypto_free_aead(tfm);
++
++}
++
++
+ static int test_hash_jiffies_digest(struct hash_desc *desc,
+ 				    struct scatterlist *sg, int blen,
+ 				    char *out, int sec)
+@@ -411,7 +650,7 @@
+ 	struct scatterlist sg[TVMEMSIZE];
+ 	struct crypto_hash *tfm;
+ 	struct hash_desc desc;
+-	static char output[1024];
++	char output[1024];
+ 	int i;
+ 	int ret;
+ 
+@@ -461,40 +700,14 @@
+ 			printk(KERN_ERR "hashing failed ret=%d\n", ret);
+ 			break;
+ 		}
++
+ 	}
+ 
+ out:
+ 	crypto_free_hash(tfm);
+ }
+ 
+-struct tcrypt_result {
+-	struct completion completion;
+-	int err;
+-};
+-
+-static void tcrypt_complete(struct crypto_async_request *req, int err)
+-{
+-	struct tcrypt_result *res = req->data;
+-
+-	if (err == -EINPROGRESS)
+-		return;
+-
+-	res->err = err;
+-	complete(&res->completion);
+-}
+-
+-static inline int do_one_ahash_op(struct ahash_request *req, int ret)
+-{
+-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+-		struct tcrypt_result *tr = req->base.data;
+ 
+-		ret = wait_for_completion_interruptible(&tr->completion);
+-		if (!ret)
+-			ret = tr->err;
+-		INIT_COMPLETION(tr->completion);
+-	}
+-	return ret;
+-}
+ 
+ static int test_ahash_jiffies_digest(struct ahash_request *req, int blen,
+ 				     char *out, int sec)
+@@ -650,7 +863,7 @@
+ 	struct tcrypt_result tresult;
+ 	struct ahash_request *req;
+ 	struct crypto_ahash *tfm;
+-	static char output[1024];
++	char output[1024];
+ 	int i, ret;
+ 
+ 	printk(KERN_INFO "\ntesting speed of async %s\n", algo);
+@@ -703,6 +916,7 @@
+ 			pr_err("hashing failed ret=%d\n", ret);
+ 			break;
+ 		}
++
+ 	}
+ 
+ 	ahash_request_free(req);
+@@ -731,6 +945,8 @@
+ 	/* non-fips algs return -EINVAL in fips mode */
+ 	if (fips_enabled && ret == -EINVAL)
+ 		ret = 0;
++	//printk("Bird (tcrypt_test in tcrypt.c) - test alg %s - result %d \n ", alg, ret);
++
+ 	return ret;
+ }
+ 
+@@ -936,6 +1152,42 @@
+ 		ret += tcrypt_test("rfc4309(ccm(aes))");
+ 		break;
+ 
++	case 46:
++		ret += tcrypt_test("ecb(aes)");
++		break;
++
++	case 47:
++		ret += tcrypt_test("cbc(aes)");
++		break;
++
++	case 48:
++		ret += tcrypt_test("xts(aes)");
++		break;
++
++	case 49:
++		ret += tcrypt_test("ctr(aes)");
++		break;
++
++	case 50:
++		ret += tcrypt_test("rfc3686(ctr(aes))");
++		break;
++
++	case 51:
++		ret += tcrypt_test("ecb(des)");
++		break;
++
++	case 52:
++		ret += tcrypt_test("cbc(des)");
++		break;
++
++	case 53:
++		ret += tcrypt_test("ecb(des3_ede)");
++		break;
++
++	case 54:
++		ret += tcrypt_test("cbc(des3_ede)");
++		break;
++
+ 	case 100:
+ 		ret += tcrypt_test("hmac(md5)");
+ 		break;
+@@ -1215,6 +1467,48 @@
+ 	case 499:
+ 		break;
+ 
++	case 500:
++
++	case 501:
++		test_aead_speed("authenc(hmac(sha1),cbc(aes))", sec,
++			NULL, 0,speed_template_16_24_32);
++
++		if (mode > 500 && mode < 600) break;
++
++	case 502:
++		test_aead_speed("authenc(hmac(sha1),cbc(des3_ede))", sec,
++			des3_speed_template, DES3_SPEED_VECTORS,speed_template_24);
++
++		if (mode > 500 && mode < 600) break;
++
++
++	case 503:
++		test_aead_speed("authenc(hmac(sha256),cbc(aes))", sec,
++			NULL, 0,speed_template_16_24_32);
++
++		if (mode > 500 && mode < 600) break;
++
++
++	case 504:
++		test_aead_speed("authenc(hmac(sha256),cbc(des3_ede))", sec,
++			des3_speed_template, DES3_SPEED_VECTORS,speed_template_24);
++
++		if (mode > 500 && mode < 600) break;
++
++
++	case 505:
++		test_aead_speed("authenc(hmac(md5),cbc(aes))", sec,
++			NULL, 0,speed_template_16_24_32);
++
++		if (mode > 500 && mode < 600) break;
++
++	case 506:
++		test_aead_speed("authenc(hmac(md5),cbc(des3_ede))", sec,
++			des3_speed_template, DES3_SPEED_VECTORS,speed_template_24);
++
++		break;
++
++
+ 	case 1000:
+ 		test_available();
+ 		break;
+diff -Naur linux-2.6.36/crypto/testmgr.h linux-2.6.36-new/crypto/testmgr.h
+--- linux-2.6.36/crypto/testmgr.h	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/crypto/testmgr.h	2011-09-04 11:07:48.000000000 -0700
+@@ -20,6 +20,8 @@
+ 
+ #include <crypto/compress.h>
+ 
++#ifndef CONFIG_CRYPTO_MANAGER_NO_TESTS
++
+ #define MAX_DIGEST_SIZE		64
+ #define MAX_TAP			8
+ 
+@@ -133,7 +135,7 @@
+ /*
+  * MD5 test vectors from RFC1321
+  */
+-#define MD5_TEST_VECTORS	7
++#define MD5_TEST_VECTORS	7 
+ 
+ static struct hash_testvec md5_tv_template[] = {
+ 	{
+@@ -1601,18 +1603,19 @@
+ 	},
+ };
+ 
+-#define XCBC_AES_TEST_VECTORS 6
++#define XCBC_AES_TEST_VECTORS 6 - 1 
+ 
+ static struct hash_testvec aes_xcbc128_tv_template[] = {
+ 	{
+-		.key	= "\x00\x01\x02\x03\x04\x05\x06\x07"
++	/*	SPAcc engine doesn't support 0 length packets for xcbc
++	    .key	= "\x00\x01\x02\x03\x04\x05\x06\x07"
+ 			  "\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f",
+ 		.plaintext = zeroed_string,
+ 		.digest = "\x75\xf0\x25\x1d\x52\x8a\xc0\x1c"
+ 			  "\x45\x73\xdf\xd5\x84\xd7\x9f\x29",
+ 		.psize	= 0,
+ 		.ksize	= 16,
+-	}, {
++	}, {*/
+ 		.key	= "\x00\x01\x02\x03\x04\x05\x06\x07"
+ 			  "\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f",
+ 		.plaintext = "\x00\x01\x02",
+@@ -2945,7 +2948,7 @@
+ #define AES_CTR_DEC_TEST_VECTORS 3
+ #define AES_CTR_3686_ENC_TEST_VECTORS 7
+ #define AES_CTR_3686_DEC_TEST_VECTORS 6
+-#define AES_GCM_ENC_TEST_VECTORS 9
++#define AES_GCM_ENC_TEST_VECTORS 9 - 3
+ #define AES_GCM_DEC_TEST_VECTORS 8
+ #define AES_CCM_ENC_TEST_VECTORS 7
+ #define AES_CCM_DEC_TEST_VECTORS 7
+@@ -5469,12 +5472,13 @@
+ 
+ static struct aead_testvec aes_gcm_enc_tv_template[] = {
+ 	{ /* From McGrew & Viega - http://citeseer.ist.psu.edu/656989.html */
+-		.key    = zeroed_string,
++/*  SPAcc engine doesn't support 0 length packets  for gcm
++    .key    = zeroed_string,
+ 		.klen	= 16,
+ 		.result	= "\x58\xe2\xfc\xce\xfa\x7e\x30\x61"
+ 			  "\x36\x7f\x1d\x57\xa4\xe7\x45\x5a",
+ 		.rlen	= 16,
+-	}, {
++	}, {*/
+ 		.key    = zeroed_string,
+ 		.klen	= 16,
+ 		.input  = zeroed_string,
+@@ -5541,12 +5545,12 @@
+ 			  "\x94\xfa\xe9\x5a\xe7\x12\x1a\x47",
+ 		.rlen	= 76,
+ 	}, {
+-		.key    = zeroed_string,
++/*		.key    = zeroed_string,
+ 		.klen	= 24,
+ 		.result	= "\xcd\x33\xb2\x8a\xc7\x73\xf7\x4b"
+ 			  "\xa0\x0e\xd1\xf3\x12\x57\x24\x35",
+ 		.rlen	= 16,
+-	}, {
++	}, {*/
+ 		.key    = zeroed_string,
+ 		.klen	= 24,
+ 		.input  = zeroed_string,
+@@ -5618,12 +5622,12 @@
+ 		.tap	= { 32, 28 },
+ 		.anp	= 2,
+ 		.atap	= { 8, 12 }
+-	}, {
++/*	}, {
+ 		.key    = zeroed_string,
+ 		.klen	= 32,
+ 		.result	= "\x53\x0f\x8a\xfb\xc7\x45\x36\xb9"
+ 			  "\xa9\x63\xb4\xf1\xc4\xcb\x73\x8b",
+-		.rlen	= 16,
++		.rlen	= 16,*/
+ 	}
+ };
+ 
+@@ -9608,4 +9612,6 @@
+ 	},
+ };
+ 
++#endif /* CONFIG_CRYPTO_MANAGER_NO_TESTS */
++
+ #endif	/* _CRYPTO_TESTMGR_H */

@@ -1,0 +1,19 @@
+Bit[N] = Bit[N-31] ^ Bit[N-28]
+
+new = ((old >> 31) ^ (old >> 28)) << 32
+new = (old << 1) ^ (old << 4)
+
+
+
+Bit[N] = (Bit[N-31-31] ^ Bit[N-31-28]) ^ (Bit[N-28-31] ^ Bit[N-28-28])
+Bit[N] = (Bit[N-62] ^ Bit[N-59]) ^ (Bit[N-59] ^ Bit[N-56])
+Bit[N] = Bit[N-62] ^ Bit[N-56]
+
+new = ((old >> 62) ^ (old >> 56)) << 32
+new = (old >> 30) ^ (old >> 24)
+
+
+
+Bit[N] = (Bit[N-62-62] ^ Bit[N-62-56]) ^ (Bit[N-56-62] ^ Bit[N-56-56])
+Bit[N] = Bit[N-124] ^ Bit[N-112]
+

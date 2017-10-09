@@ -1,0 +1,34 @@
+menu "SD card reader support"
+     depends on ARCH_GOLDENGATE
+
+     config CS752X_SD
+     	    tristate "SD card driver"
+	    select CONFIG_MMC
+	    select CONFIG_MMC_BLOCK
+	    help
+	      Goldengate SD card reader drivers.
+
+    config CS752X_SD_25MHZ
+    	   depends on CS752X_SD
+           bool "SD host operating at 25MHz"
+           default n
+           help
+             This configure will change the operation frequency of sd host
+             controller to 25MHz.
+
+    config CS752X_SD_DEBUG
+    	   depends on CS752X_SD
+    	   select MMC_DEBUG
+           bool "Enable printing SD driver debug message"
+           default n
+           help
+             If you want to print the sd driver debugging message, enable the option.
+
+    config CS752X_SD_REQUEST_ONEPAGE
+	   depends on CS752X_SD_DEBUG
+           bool "Perform one page data transfer only"
+           default n
+           help
+             If you want to perform one page (4096 byte) data transfer, enable the option.
+
+endmenu

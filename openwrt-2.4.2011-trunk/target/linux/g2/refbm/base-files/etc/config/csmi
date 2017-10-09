@@ -1,0 +1,24 @@
+# Cortina Systems Multi Image Upgrade
+#
+# Set these parameters correctly for your platform implementation.
+#
+# erase_size		Erase block size for your flash
+# mgmt_part_name	The mtd partition name for your JFFS2
+#                       holding the active and standby image sets
+# sb0_device		The mtd device holding superblock 0
+# sb1_device		The mtd device holding superblock 1
+#
+# handlers		Location of cs.swdl handlers (.so files)
+# handler		The swdl handler to use by default
+# handler_opts          Any handler-specific options to pass
+#
+config csmi flash
+       option erase_size	0x20000
+       option mgmt_part_name	mgmt
+       option sb0_device	/dev/mtd2
+       option sb1_device	/dev/mtd3
+ 
+config csmi swdl
+       option handlers		/lib/cs_swdl_handlers
+       option handler		cs_swdl_tmpfiles
+       option handler_opts	--tmpfiles-pattern=/tmp/upgrade.XXXXXX

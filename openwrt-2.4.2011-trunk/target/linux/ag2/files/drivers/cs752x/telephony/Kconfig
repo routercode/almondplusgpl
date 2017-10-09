@@ -1,0 +1,23 @@
+#
+# Telephony device configuration
+#
+menu "Telephony support"
+     depends on ARCH_GOLDENGATE && PHONE
+
+     config PHONE_CS75XX_WRAPPER
+	tristate "Cortina CS75XX phone wrapper"
+	depends on ARCH_GOLDENGATE
+	
+     choice
+	prompt "SLOT Selection"
+	depends on PHONE_CS75XX_WRAPPER && CORTINA_ENGINEERING
+	default SLIC_SLOT0
+	
+	config SLIC_SLOT0
+	       bool "SLOT 0"
+
+	config SSP_INDEX1
+	       bool "SLOT 1"
+     endchoice
+
+endmenu

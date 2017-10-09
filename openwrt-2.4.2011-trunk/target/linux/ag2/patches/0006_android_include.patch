@@ -1,0 +1,2337 @@
+diff -Naur g2-2.6.36/include/linux/akm8975.h merged-2.6.36/include/linux/akm8975.h
+--- g2-2.6.36/include/linux/akm8975.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/akm8975.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,87 @@
++/*
++ * Definitions for akm8975 compass chip.
++ */
++#ifndef AKM8975_H
++#define AKM8975_H
++
++#include <linux/ioctl.h>
++
++/*! \name AK8975 operation mode
++ \anchor AK8975_Mode
++ Defines an operation mode of the AK8975.*/
++/*! @{*/
++#define AK8975_MODE_SNG_MEASURE   0x01
++#define	AK8975_MODE_SELF_TEST     0x08
++#define	AK8975_MODE_FUSE_ACCESS   0x0F
++#define	AK8975_MODE_POWER_DOWN    0x00
++/*! @}*/
++
++#define RBUFF_SIZE		8	/* Rx buffer size */
++
++/*! \name AK8975 register address
++\anchor AK8975_REG
++Defines a register address of the AK8975.*/
++/*! @{*/
++#define AK8975_REG_WIA		0x00
++#define AK8975_REG_INFO		0x01
++#define AK8975_REG_ST1		0x02
++#define AK8975_REG_HXL		0x03
++#define AK8975_REG_HXH		0x04
++#define AK8975_REG_HYL		0x05
++#define AK8975_REG_HYH		0x06
++#define AK8975_REG_HZL		0x07
++#define AK8975_REG_HZH		0x08
++#define AK8975_REG_ST2		0x09
++#define AK8975_REG_CNTL		0x0A
++#define AK8975_REG_RSV		0x0B
++#define AK8975_REG_ASTC		0x0C
++#define AK8975_REG_TS1		0x0D
++#define AK8975_REG_TS2		0x0E
++#define AK8975_REG_I2CDIS	0x0F
++/*! @}*/
++
++/*! \name AK8975 fuse-rom address
++\anchor AK8975_FUSE
++Defines a read-only address of the fuse ROM of the AK8975.*/
++/*! @{*/
++#define AK8975_FUSE_ASAX	0x10
++#define AK8975_FUSE_ASAY	0x11
++#define AK8975_FUSE_ASAZ	0x12
++/*! @}*/
++
++#define AKMIO                   0xA1
++
++/* IOCTLs for AKM library */
++#define ECS_IOCTL_WRITE                 _IOW(AKMIO, 0x02, char[5])
++#define ECS_IOCTL_READ                  _IOWR(AKMIO, 0x03, char[5])
++#define ECS_IOCTL_GETDATA               _IOR(AKMIO, 0x08, char[RBUFF_SIZE])
++#define ECS_IOCTL_SET_YPR               _IOW(AKMIO, 0x0C, short[12])
++#define ECS_IOCTL_GET_OPEN_STATUS       _IOR(AKMIO, 0x0D, int)
++#define ECS_IOCTL_GET_CLOSE_STATUS      _IOR(AKMIO, 0x0E, int)
++#define ECS_IOCTL_GET_DELAY             _IOR(AKMIO, 0x30, short)
++
++/* IOCTLs for APPs */
++#define ECS_IOCTL_APP_SET_MFLAG		_IOW(AKMIO, 0x11, short)
++#define ECS_IOCTL_APP_GET_MFLAG		_IOW(AKMIO, 0x12, short)
++#define ECS_IOCTL_APP_SET_AFLAG		_IOW(AKMIO, 0x13, short)
++#define ECS_IOCTL_APP_GET_AFLAG		_IOR(AKMIO, 0x14, short)
++#define ECS_IOCTL_APP_SET_DELAY		_IOW(AKMIO, 0x18, short)
++#define ECS_IOCTL_APP_GET_DELAY		ECS_IOCTL_GET_DELAY
++/* Set raw magnetic vector flag */
++#define ECS_IOCTL_APP_SET_MVFLAG	_IOW(AKMIO, 0x19, short)
++/* Get raw magnetic vector flag */
++#define ECS_IOCTL_APP_GET_MVFLAG	_IOR(AKMIO, 0x1A, short)
++#define ECS_IOCTL_APP_SET_TFLAG         _IOR(AKMIO, 0x15, short)
++
++
++struct akm8975_platform_data {
++	int intr;
++
++	int (*init)(void);
++	void (*exit)(void);
++	int (*power_on)(void);
++	int (*power_off)(void);
++};
++
++#endif
++
+diff -Naur g2-2.6.36/include/linux/amba/mmci.h merged-2.6.36/include/linux/amba/mmci.h
+--- g2-2.6.36/include/linux/amba/mmci.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/amba/mmci.h	2011-08-09 08:49:41.000000000 -0700
+@@ -5,6 +5,15 @@
+ #define AMBA_MMCI_H
+ 
+ #include <linux/mmc/host.h>
++#include <linux/mmc/card.h>
++#include <linux/mmc/sdio_func.h>
++
++struct embedded_sdio_data {
++        struct sdio_cis cis;
++        struct sdio_cccr cccr;
++        struct sdio_embedded_func *funcs;
++        int num_funcs;
++};
+ 
+ /**
+  * struct mmci_platform_data - platform configuration for the MMCI
+@@ -36,6 +45,9 @@
+ 	int	gpio_wp;
+ 	int	gpio_cd;
+ 	unsigned long capabilities;
++	unsigned int status_irq;
++	struct embedded_sdio_data *embedded_sdio;
++	int (*register_status_notify)(void (*callback)(int card_present, void *dev_id), void *dev_id);
+ };
+ 
+ #endif
+diff -Naur g2-2.6.36/include/linux/android_aid.h merged-2.6.36/include/linux/android_aid.h
+--- g2-2.6.36/include/linux/android_aid.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/android_aid.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,26 @@
++/* include/linux/android_aid.h
++ *
++ * Copyright (C) 2008 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_ANDROID_AID_H
++#define _LINUX_ANDROID_AID_H
++
++/* AIDs that the kernel treats differently */
++#define AID_NET_BT_ADMIN 3001
++#define AID_NET_BT       3002
++#define AID_INET         3003
++#define AID_NET_RAW      3004
++#define AID_NET_ADMIN    3005
++
++#endif
+diff -Naur g2-2.6.36/include/linux/android_alarm.h merged-2.6.36/include/linux/android_alarm.h
+--- g2-2.6.36/include/linux/android_alarm.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/android_alarm.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,106 @@
++/* include/linux/android_alarm.h
++ *
++ * Copyright (C) 2006-2007 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_ANDROID_ALARM_H
++#define _LINUX_ANDROID_ALARM_H
++
++#include <linux/ioctl.h>
++#include <linux/time.h>
++
++enum android_alarm_type {
++	/* return code bit numbers or set alarm arg */
++	ANDROID_ALARM_RTC_WAKEUP,
++	ANDROID_ALARM_RTC,
++	ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP,
++	ANDROID_ALARM_ELAPSED_REALTIME,
++	ANDROID_ALARM_SYSTEMTIME,
++
++	ANDROID_ALARM_TYPE_COUNT,
++
++	/* return code bit numbers */
++	/* ANDROID_ALARM_TIME_CHANGE = 16 */
++};
++
++#ifdef __KERNEL__
++
++#include <linux/ktime.h>
++#include <linux/rbtree.h>
++
++/*
++ * The alarm interface is similar to the hrtimer interface but adds support
++ * for wakeup from suspend. It also adds an elapsed realtime clock that can
++ * be used for periodic timers that need to keep runing while the system is
++ * suspended and not be disrupted when the wall time is set.
++ */
++
++/**
++ * struct alarm - the basic alarm structure
++ * @node:	red black tree node for time ordered insertion
++ * @type:	alarm type. rtc/elapsed-realtime/systemtime, wakeup/non-wakeup.
++ * @softexpires: the absolute earliest expiry time of the alarm.
++ * @expires:	the absolute expiry time.
++ * @function:	alarm expiry callback function
++ *
++ * The alarm structure must be initialized by alarm_init()
++ *
++ */
++
++struct alarm {
++	struct rb_node 		node;
++	enum android_alarm_type type;
++	ktime_t			softexpires;
++	ktime_t			expires;
++	void			(*function)(struct alarm *);
++};
++
++void alarm_init(struct alarm *alarm,
++	enum android_alarm_type type, void (*function)(struct alarm *));
++void alarm_start_range(struct alarm *alarm, ktime_t start, ktime_t end);
++int alarm_try_to_cancel(struct alarm *alarm);
++int alarm_cancel(struct alarm *alarm);
++ktime_t alarm_get_elapsed_realtime(void);
++
++/* set rtc while preserving elapsed realtime */
++int alarm_set_rtc(const struct timespec ts);
++
++#endif
++
++enum android_alarm_return_flags {
++	ANDROID_ALARM_RTC_WAKEUP_MASK = 1U << ANDROID_ALARM_RTC_WAKEUP,
++	ANDROID_ALARM_RTC_MASK = 1U << ANDROID_ALARM_RTC,
++	ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP_MASK =
++				1U << ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP,
++	ANDROID_ALARM_ELAPSED_REALTIME_MASK =
++				1U << ANDROID_ALARM_ELAPSED_REALTIME,
++	ANDROID_ALARM_SYSTEMTIME_MASK = 1U << ANDROID_ALARM_SYSTEMTIME,
++	ANDROID_ALARM_TIME_CHANGE_MASK = 1U << 16
++};
++
++/* Disable alarm */
++#define ANDROID_ALARM_CLEAR(type)           _IO('a', 0 | ((type) << 4))
++
++/* Ack last alarm and wait for next */
++#define ANDROID_ALARM_WAIT                  _IO('a', 1)
++
++#define ALARM_IOW(c, type, size)            _IOW('a', (c) | ((type) << 4), size)
++/* Set alarm */
++#define ANDROID_ALARM_SET(type)             ALARM_IOW(2, type, struct timespec)
++#define ANDROID_ALARM_SET_AND_WAIT(type)    ALARM_IOW(3, type, struct timespec)
++#define ANDROID_ALARM_GET_TIME(type)        ALARM_IOW(4, type, struct timespec)
++#define ANDROID_ALARM_SET_RTC               _IOW('a', 5, struct timespec)
++#define ANDROID_ALARM_BASE_CMD(cmd)         (cmd & ~(_IOC(0, 0, 0xf0, 0)))
++#define ANDROID_ALARM_IOCTL_TO_TYPE(cmd)    (_IOC_NR(cmd) >> 4)
++
++#endif
+diff -Naur g2-2.6.36/include/linux/android_pmem.h merged-2.6.36/include/linux/android_pmem.h
+--- g2-2.6.36/include/linux/android_pmem.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/android_pmem.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,93 @@
++/* include/linux/android_pmem.h
++ *
++ * Copyright (C) 2007 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of 
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _ANDROID_PMEM_H_
++#define _ANDROID_PMEM_H_
++
++#define PMEM_IOCTL_MAGIC 'p'
++#define PMEM_GET_PHYS		_IOW(PMEM_IOCTL_MAGIC, 1, unsigned int)
++#define PMEM_MAP		_IOW(PMEM_IOCTL_MAGIC, 2, unsigned int)
++#define PMEM_GET_SIZE		_IOW(PMEM_IOCTL_MAGIC, 3, unsigned int)
++#define PMEM_UNMAP		_IOW(PMEM_IOCTL_MAGIC, 4, unsigned int)
++/* This ioctl will allocate pmem space, backing the file, it will fail
++ * if the file already has an allocation, pass it the len as the argument
++ * to the ioctl */
++#define PMEM_ALLOCATE		_IOW(PMEM_IOCTL_MAGIC, 5, unsigned int)
++/* This will connect a one pmem file to another, pass the file that is already
++ * backed in memory as the argument to the ioctl
++ */
++#define PMEM_CONNECT		_IOW(PMEM_IOCTL_MAGIC, 6, unsigned int)
++/* Returns the total size of the pmem region it is sent to as a pmem_region
++ * struct (with offset set to 0). 
++ */
++#define PMEM_GET_TOTAL_SIZE	_IOW(PMEM_IOCTL_MAGIC, 7, unsigned int)
++#define PMEM_CACHE_FLUSH	_IOW(PMEM_IOCTL_MAGIC, 8, unsigned int)
++
++struct android_pmem_platform_data
++{
++	const char* name;
++	/* starting physical address of memory region */
++	unsigned long start;
++	/* size of memory region */
++	unsigned long size;
++	/* set to indicate the region should not be managed with an allocator */
++	unsigned no_allocator;
++	/* set to indicate maps of this region should be cached, if a mix of
++	 * cached and uncached is desired, set this and open the device with
++	 * O_SYNC to get an uncached region */
++	unsigned cached;
++	/* The MSM7k has bits to enable a write buffer in the bus controller*/
++	unsigned buffered;
++};
++
++struct pmem_region {
++	unsigned long offset;
++	unsigned long len;
++};
++
++#ifdef CONFIG_ANDROID_PMEM
++int is_pmem_file(struct file *file);
++int get_pmem_file(int fd, unsigned long *start, unsigned long *vstart,
++		  unsigned long *end, struct file **filp);
++int get_pmem_user_addr(struct file *file, unsigned long *start,
++		       unsigned long *end);
++void put_pmem_file(struct file* file);
++void flush_pmem_file(struct file *file, unsigned long start, unsigned long len);
++int pmem_setup(struct android_pmem_platform_data *pdata,
++	       long (*ioctl)(struct file *, unsigned int, unsigned long),
++	       int (*release)(struct inode *, struct file *));
++int pmem_remap(struct pmem_region *region, struct file *file,
++	       unsigned operation);
++
++#else
++static inline int is_pmem_file(struct file *file) { return 0; }
++static inline int get_pmem_file(int fd, unsigned long *start,
++				unsigned long *vstart, unsigned long *end,
++				struct file **filp) { return -ENOSYS; }
++static inline int get_pmem_user_addr(struct file *file, unsigned long *start,
++				     unsigned long *end) { return -ENOSYS; }
++static inline void put_pmem_file(struct file* file) { return; }
++static inline void flush_pmem_file(struct file *file, unsigned long start,
++				   unsigned long len) { return; }
++static inline int pmem_setup(struct android_pmem_platform_data *pdata,
++	      long (*ioctl)(struct file *, unsigned int, unsigned long),
++	      int (*release)(struct inode *, struct file *)) { return -ENOSYS; }
++
++static inline int pmem_remap(struct pmem_region *region, struct file *file,
++			     unsigned operation) { return -ENOSYS; }
++#endif
++
++#endif //_ANDROID_PPP_H_
++
+diff -Naur g2-2.6.36/include/linux/ashmem.h merged-2.6.36/include/linux/ashmem.h
+--- g2-2.6.36/include/linux/ashmem.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/ashmem.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,48 @@
++/*
++ * include/linux/ashmem.h
++ *
++ * Copyright 2008 Google Inc.
++ * Author: Robert Love
++ *
++ * This file is dual licensed.  It may be redistributed and/or modified
++ * under the terms of the Apache 2.0 License OR version 2 of the GNU
++ * General Public License.
++ */
++
++#ifndef _LINUX_ASHMEM_H
++#define _LINUX_ASHMEM_H
++
++#include <linux/limits.h>
++#include <linux/ioctl.h>
++
++#define ASHMEM_NAME_LEN		256
++
++#define ASHMEM_NAME_DEF		"dev/ashmem"
++
++/* Return values from ASHMEM_PIN: Was the mapping purged while unpinned? */
++#define ASHMEM_NOT_PURGED	0
++#define ASHMEM_WAS_PURGED	1
++
++/* Return values from ASHMEM_GET_PIN_STATUS: Is the mapping pinned? */
++#define ASHMEM_IS_UNPINNED	0
++#define ASHMEM_IS_PINNED	1
++
++struct ashmem_pin {
++	__u32 offset;	/* offset into region, in bytes, page-aligned */
++	__u32 len;	/* length forward from offset, in bytes, page-aligned */
++};
++
++#define __ASHMEMIOC		0x77
++
++#define ASHMEM_SET_NAME		_IOW(__ASHMEMIOC, 1, char[ASHMEM_NAME_LEN])
++#define ASHMEM_GET_NAME		_IOR(__ASHMEMIOC, 2, char[ASHMEM_NAME_LEN])
++#define ASHMEM_SET_SIZE		_IOW(__ASHMEMIOC, 3, size_t)
++#define ASHMEM_GET_SIZE		_IO(__ASHMEMIOC, 4)
++#define ASHMEM_SET_PROT_MASK	_IOW(__ASHMEMIOC, 5, unsigned long)
++#define ASHMEM_GET_PROT_MASK	_IO(__ASHMEMIOC, 6)
++#define ASHMEM_PIN		_IOW(__ASHMEMIOC, 7, struct ashmem_pin)
++#define ASHMEM_UNPIN		_IOW(__ASHMEMIOC, 8, struct ashmem_pin)
++#define ASHMEM_GET_PIN_STATUS	_IO(__ASHMEMIOC, 9)
++#define ASHMEM_PURGE_ALL_CACHES	_IO(__ASHMEMIOC, 10)
++
++#endif	/* _LINUX_ASHMEM_H */
+diff -Naur g2-2.6.36/include/linux/cpuacct.h merged-2.6.36/include/linux/cpuacct.h
+--- g2-2.6.36/include/linux/cpuacct.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/cpuacct.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,43 @@
++/* include/linux/cpuacct.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _CPUACCT_H_
++#define _CPUACCT_H_
++
++#include <linux/cgroup.h>
++
++#ifdef CONFIG_CGROUP_CPUACCT
++
++/*
++ * Platform specific CPU frequency hooks for cpuacct. These functions are
++ * called from the scheduler.
++ */
++struct cpuacct_charge_calls {
++	/*
++	 * Platforms can take advantage of this data and use
++	 * per-cpu allocations if necessary.
++	 */
++	void (*init) (void **cpuacct_data);
++	void (*charge) (void *cpuacct_data,  u64 cputime, unsigned int cpu);
++	void (*cpufreq_show) (void *cpuacct_data, struct cgroup_map_cb *cb);
++	/* Returns power consumed in milliWatt seconds */
++	u64 (*power_usage) (void *cpuacct_data);
++};
++
++int cpuacct_charge_register(struct cpuacct_charge_calls *fn);
++
++#endif /* CONFIG_CGROUP_CPUACCT */
++
++#endif // _CPUACCT_H_
+diff -Naur g2-2.6.36/include/linux/cpufreq.h merged-2.6.36/include/linux/cpufreq.h
+--- g2-2.6.36/include/linux/cpufreq.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/cpufreq.h	2011-08-09 08:49:41.000000000 -0700
+@@ -364,6 +364,9 @@
+ #elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE)
+ extern struct cpufreq_governor cpufreq_gov_conservative;
+ #define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_conservative)
++#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_INTERACTIVE)
++extern struct cpufreq_governor cpufreq_gov_interactive;
++#define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_interactive)
+ #endif
+ 
+ 
+diff -Naur g2-2.6.36/include/linux/earlysuspend.h merged-2.6.36/include/linux/earlysuspend.h
+--- g2-2.6.36/include/linux/earlysuspend.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/earlysuspend.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,56 @@
++/* include/linux/earlysuspend.h
++ *
++ * Copyright (C) 2007-2008 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_EARLYSUSPEND_H
++#define _LINUX_EARLYSUSPEND_H
++
++#ifdef CONFIG_HAS_EARLYSUSPEND
++#include <linux/list.h>
++#endif
++
++/* The early_suspend structure defines suspend and resume hooks to be called
++ * when the user visible sleep state of the system changes, and a level to
++ * control the order. They can be used to turn off the screen and input
++ * devices that are not used for wakeup.
++ * Suspend handlers are called in low to high level order, resume handlers are
++ * called in the opposite order. If, when calling register_early_suspend,
++ * the suspend handlers have already been called without a matching call to the
++ * resume handlers, the suspend handler will be called directly from
++ * register_early_suspend. This direct call can violate the normal level order.
++ */
++enum {
++	EARLY_SUSPEND_LEVEL_BLANK_SCREEN = 50,
++	EARLY_SUSPEND_LEVEL_STOP_DRAWING = 100,
++	EARLY_SUSPEND_LEVEL_DISABLE_FB = 150,
++};
++struct early_suspend {
++#ifdef CONFIG_HAS_EARLYSUSPEND
++	struct list_head link;
++	int level;
++	void (*suspend)(struct early_suspend *h);
++	void (*resume)(struct early_suspend *h);
++#endif
++};
++
++#ifdef CONFIG_HAS_EARLYSUSPEND
++void register_early_suspend(struct early_suspend *handler);
++void unregister_early_suspend(struct early_suspend *handler);
++#else
++#define register_early_suspend(handler) do { } while (0)
++#define unregister_early_suspend(handler) do { } while (0)
++#endif
++
++#endif
++
+diff -Naur g2-2.6.36/include/linux/genhd.h merged-2.6.36/include/linux/genhd.h
+--- g2-2.6.36/include/linux/genhd.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/linux/genhd.h	2011-08-09 08:49:41.000000000 -0700
+@@ -21,6 +21,8 @@
+ #define disk_to_dev(disk)	(&(disk)->part0.__dev)
+ #define part_to_dev(part)	(&((part)->__dev))
+ 
++#define GENHD_PART_NAME_SIZE	128
++
+ extern struct device_type part_type;
+ extern struct kobject *block_depr;
+ extern struct class block_class;
+@@ -106,6 +108,7 @@
+ 	struct disk_stats dkstats;
+ #endif
+ 	struct rcu_head rcu_head;
++	char partition_name[GENHD_PART_NAME_SIZE];
+ };
+ 
+ #define GENHD_FL_REMOVABLE			1
+diff -Naur g2-2.6.36/include/linux/gpio_event.h merged-2.6.36/include/linux/gpio_event.h
+--- g2-2.6.36/include/linux/gpio_event.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/gpio_event.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,169 @@
++/* include/linux/gpio_event.h
++ *
++ * Copyright (C) 2007 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_GPIO_EVENT_H
++#define _LINUX_GPIO_EVENT_H
++
++#include <linux/input.h>
++
++struct gpio_event_input_devs {
++	int count;
++	struct input_dev *dev[];
++};
++enum {
++	GPIO_EVENT_FUNC_UNINIT  = 0x0,
++	GPIO_EVENT_FUNC_INIT    = 0x1,
++	GPIO_EVENT_FUNC_SUSPEND = 0x2,
++	GPIO_EVENT_FUNC_RESUME  = 0x3,
++};
++struct gpio_event_info {
++	int (*func)(struct gpio_event_input_devs *input_devs,
++		    struct gpio_event_info *info,
++		    void **data, int func);
++	int (*event)(struct gpio_event_input_devs *input_devs,
++		     struct gpio_event_info *info,
++		     void **data, unsigned int dev, unsigned int type,
++		     unsigned int code, int value); /* out events */
++	bool no_suspend;
++};
++
++struct gpio_event_platform_data {
++	const char *name;
++	struct gpio_event_info **info;
++	size_t info_count;
++	int (*power)(const struct gpio_event_platform_data *pdata, bool on);
++	const char *names[]; /* If name is NULL, names contain a NULL */
++			     /* terminated list of input devices to create */
++};
++
++#define GPIO_EVENT_DEV_NAME "gpio-event"
++
++/* Key matrix */
++
++enum gpio_event_matrix_flags {
++	/* unset: drive active output low, set: drive active output high */
++	GPIOKPF_ACTIVE_HIGH              = 1U << 0,
++	GPIOKPF_DEBOUNCE                 = 1U << 1,
++	GPIOKPF_REMOVE_SOME_PHANTOM_KEYS = 1U << 2,
++	GPIOKPF_REMOVE_PHANTOM_KEYS      = GPIOKPF_REMOVE_SOME_PHANTOM_KEYS |
++					   GPIOKPF_DEBOUNCE,
++	GPIOKPF_DRIVE_INACTIVE           = 1U << 3,
++	GPIOKPF_LEVEL_TRIGGERED_IRQ      = 1U << 4,
++	GPIOKPF_PRINT_UNMAPPED_KEYS      = 1U << 16,
++	GPIOKPF_PRINT_MAPPED_KEYS        = 1U << 17,
++	GPIOKPF_PRINT_PHANTOM_KEYS       = 1U << 18,
++};
++
++#define MATRIX_CODE_BITS (10)
++#define MATRIX_KEY_MASK ((1U << MATRIX_CODE_BITS) - 1)
++#define MATRIX_KEY(dev, code) \
++	(((dev) << MATRIX_CODE_BITS) | (code & MATRIX_KEY_MASK))
++
++extern int gpio_event_matrix_func(struct gpio_event_input_devs *input_devs,
++			struct gpio_event_info *info, void **data, int func);
++struct gpio_event_matrix_info {
++	/* initialize to gpio_event_matrix_func */
++	struct gpio_event_info info;
++	/* size must be ninputs * noutputs */
++	const unsigned short *keymap;
++	unsigned int *input_gpios;
++	unsigned int *output_gpios;
++	unsigned int ninputs;
++	unsigned int noutputs;
++	/* time to wait before reading inputs after driving each output */
++	ktime_t settle_time;
++	/* time to wait before scanning the keypad a second time */
++	ktime_t debounce_delay;
++	ktime_t poll_time;
++	unsigned flags;
++};
++
++/* Directly connected inputs and outputs */
++
++enum gpio_event_direct_flags {
++	GPIOEDF_ACTIVE_HIGH         = 1U << 0,
++/*	GPIOEDF_USE_DOWN_IRQ        = 1U << 1, */
++/*	GPIOEDF_USE_IRQ             = (1U << 2) | GPIOIDF_USE_DOWN_IRQ, */
++	GPIOEDF_PRINT_KEYS          = 1U << 8,
++	GPIOEDF_PRINT_KEY_DEBOUNCE  = 1U << 9,
++};
++
++struct gpio_event_direct_entry {
++	uint32_t gpio:16;
++	uint32_t code:10;
++	uint32_t dev:6;
++};
++
++/* inputs */
++extern int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
++			struct gpio_event_info *info, void **data, int func);
++struct gpio_event_input_info {
++	/* initialize to gpio_event_input_func */
++	struct gpio_event_info info;
++	ktime_t debounce_time;
++	ktime_t poll_time;
++	uint16_t flags;
++	uint16_t type;
++	const struct gpio_event_direct_entry *keymap;
++	size_t keymap_size;
++};
++
++/* outputs */
++extern int gpio_event_output_func(struct gpio_event_input_devs *input_devs,
++			struct gpio_event_info *info, void **data, int func);
++extern int gpio_event_output_event(struct gpio_event_input_devs *input_devs,
++			struct gpio_event_info *info, void **data,
++			unsigned int dev, unsigned int type,
++			unsigned int code, int value);
++struct gpio_event_output_info {
++	/* initialize to gpio_event_output_func and gpio_event_output_event */
++	struct gpio_event_info info;
++	uint16_t flags;
++	uint16_t type;
++	const struct gpio_event_direct_entry *keymap;
++	size_t keymap_size;
++};
++
++
++/* axes */
++
++enum gpio_event_axis_flags {
++	GPIOEAF_PRINT_UNKNOWN_DIRECTION  = 1U << 16,
++	GPIOEAF_PRINT_RAW                = 1U << 17,
++	GPIOEAF_PRINT_EVENT              = 1U << 18,
++};
++
++extern int gpio_event_axis_func(struct gpio_event_input_devs *input_devs,
++			struct gpio_event_info *info, void **data, int func);
++struct gpio_event_axis_info {
++	/* initialize to gpio_event_axis_func */
++	struct gpio_event_info info;
++	uint8_t  count; /* number of gpios for this axis */
++	uint8_t  dev; /* device index when using multiple input devices */
++	uint8_t  type; /* EV_REL or EV_ABS */
++	uint16_t code;
++	uint16_t decoded_size;
++	uint16_t (*map)(struct gpio_event_axis_info *info, uint16_t in);
++	uint32_t *gpio;
++	uint32_t flags;
++};
++#define gpio_axis_2bit_gray_map gpio_axis_4bit_gray_map
++#define gpio_axis_3bit_gray_map gpio_axis_4bit_gray_map
++uint16_t gpio_axis_4bit_gray_map(
++			struct gpio_event_axis_info *info, uint16_t in);
++uint16_t gpio_axis_5bit_singletrack_map(
++			struct gpio_event_axis_info *info, uint16_t in);
++
++#endif
+diff -Naur g2-2.6.36/include/linux/if_pppolac.h merged-2.6.36/include/linux/if_pppolac.h
+--- g2-2.6.36/include/linux/if_pppolac.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/if_pppolac.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,35 @@
++/* include/linux/if_pppolac.h
++ *
++ * Header for PPP on L2TP Access Concentrator / PPPoLAC Socket (RFC 2661)
++ *
++ * Copyright (C) 2009 Google, Inc.
++ * Author: Chia-chi Yeh <chiachi@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_IF_PPPOLAC_H
++#define __LINUX_IF_PPPOLAC_H
++
++#include <linux/socket.h>
++#include <linux/types.h>
++
++#define PX_PROTO_OLAC	2
++
++struct sockaddr_pppolac {
++	sa_family_t	sa_family;	/* AF_PPPOX */
++	unsigned int	sa_protocol;	/* PX_PROTO_OLAC */
++	int		udp_socket;
++	struct __attribute__((packed)) {
++		__u16	tunnel, session;
++	} local, remote;
++} __attribute__((packed));
++
++#endif /* __LINUX_IF_PPPOLAC_H */
+diff -Naur g2-2.6.36/include/linux/if_pppopns.h merged-2.6.36/include/linux/if_pppopns.h
+--- g2-2.6.36/include/linux/if_pppopns.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/if_pppopns.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,34 @@
++/* include/linux/if_pppopns.h
++ *
++ * Header for PPP on PPTP Network Server / PPPoPNS Socket (RFC 2637)
++ *
++ * Copyright (C) 2009 Google, Inc.
++ * Author: Chia-chi Yeh <chiachi@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_IF_PPPOPNS_H
++#define __LINUX_IF_PPPOPNS_H
++
++#include <linux/socket.h>
++#include <linux/types.h>
++
++#define PX_PROTO_OPNS	3
++
++struct sockaddr_pppopns {
++	sa_family_t	sa_family;	/* AF_PPPOX */
++	unsigned int	sa_protocol;	/* PX_PROTO_OPNS */
++	int		tcp_socket;
++	__u16		local;
++	__u16		remote;
++} __attribute__((packed));
++
++#endif /* __LINUX_IF_PPPOPNS_H */
+diff -Naur g2-2.6.36/include/linux/if_pppox.h merged-2.6.36/include/linux/if_pppox.h
+--- g2-2.6.36/include/linux/if_pppox.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/linux/if_pppox.h	2011-08-09 08:49:41.000000000 -0700
+@@ -27,6 +27,8 @@
+ #include <linux/ppp_channel.h>
+ #endif /* __KERNEL__ */
+ #include <linux/if_pppol2tp.h>
++#include <linux/if_pppolac.h>
++#include <linux/if_pppopns.h>
+ 
+ /* For user-space programs to pick up these definitions
+  * which they wouldn't get otherwise without defining __KERNEL__
+@@ -51,7 +53,9 @@
+  */ 
+ #define PX_PROTO_OE    0 /* Currently just PPPoE */
+ #define PX_PROTO_OL2TP 1 /* Now L2TP also */
+-#define PX_MAX_PROTO   2
++#define PX_PROTO_OLAC  2
++#define PX_PROTO_OPNS  3
++#define PX_MAX_PROTO   4
+ 
+ struct sockaddr_pppox { 
+        sa_family_t     sa_family;            /* address family, AF_PPPOX */ 
+@@ -150,6 +154,24 @@
+ 					     relayed to (PPPoE relaying) */
+ };
+ 
++struct pppolac_opt {
++	__u32		local;
++	__u32		remote;
++	__u32		recv_sequence;
++	__u32		xmit_sequence;
++	atomic_t	sequencing;
++	int		(*backlog_rcv)(struct sock *sk_udp, struct sk_buff *skb);
++};
++
++struct pppopns_opt {
++	__u16		local;
++	__u16		remote;
++	__u32		recv_sequence;
++	__u32		xmit_sequence;
++	void		(*data_ready)(struct sock *sk_raw, int length);
++	int		(*backlog_rcv)(struct sock *sk_raw, struct sk_buff *skb);
++};
++
+ #include <net/sock.h>
+ 
+ struct pppox_sock {
+@@ -159,6 +181,8 @@
+ 	struct pppox_sock	*next;	  /* for hash table */
+ 	union {
+ 		struct pppoe_opt pppoe;
++		struct pppolac_opt lac;
++		struct pppopns_opt pns;
+ 	} proto;
+ 	__be16			num;
+ };
+diff -Naur g2-2.6.36/include/linux/kernel_debugger.h merged-2.6.36/include/linux/kernel_debugger.h
+--- g2-2.6.36/include/linux/kernel_debugger.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/kernel_debugger.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,41 @@
++/*
++ * include/linux/kernel_debugger.h
++ *
++ * Copyright (C) 2008 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _LINUX_KERNEL_DEBUGGER_H_
++#define _LINUX_KERNEL_DEBUGGER_H_
++
++struct kdbg_ctxt {
++	int (*printf)(void *cookie, const char *fmt, ...);
++	void *cookie;
++};
++
++/* kernel_debugger() is called from IRQ context and should
++ * use the kdbg_ctxt.printf to write output (do NOT call
++ * printk, do operations not safe from IRQ context, etc).
++ *
++ * kdbg_ctxt.printf will return -1 if there is not enough
++ * buffer space or if you are being aborted.  In this case
++ * you must return as soon as possible.
++ *
++ * Return non-zero if more data is available -- if buffer
++ * space ran and you had to stop, but could print more,
++ * for example.
++ *
++ * Additional calls where cmd is "more" will be made if
++ * the additional data is desired.
++ */
++int kernel_debugger(struct kdbg_ctxt *ctxt, char *cmd);
++
++#endif
+diff -Naur g2-2.6.36/include/linux/keychord.h merged-2.6.36/include/linux/keychord.h
+--- g2-2.6.36/include/linux/keychord.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/keychord.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,52 @@
++/*
++ *  Key chord input driver
++ *
++ * Copyright (C) 2008 Google, Inc.
++ * Author: Mike Lockwood <lockwood@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++*/
++
++#ifndef __LINUX_KEYCHORD_H_
++#define __LINUX_KEYCHORD_H_
++
++#include <linux/input.h>
++
++#define KEYCHORD_VERSION		1
++
++/*
++ * One or more input_keychord structs are written to /dev/keychord
++ * at once to specify the list of keychords to monitor.
++ * Reading /dev/keychord returns the id of a keychord when the
++ * keychord combination is pressed.  A keychord is signalled when
++ * all of the keys in the keycode list are in the pressed state.
++ * The order in which the keys are pressed does not matter.
++ * The keychord will not be signalled if keys not in the keycode
++ * list are pressed.
++ * Keychords will not be signalled on key release events.
++ */
++struct input_keychord {
++	/* should be KEYCHORD_VERSION */
++	__u16 version;
++	/*
++	 * client specified ID, returned from read()
++	 * when this keychord is pressed.
++	 */
++	__u16 id;
++
++	/* number of keycodes in this keychord */
++	__u16 count;
++
++	/* variable length array of keycodes */
++	__u16 keycodes[];
++};
++
++#endif	/* __LINUX_KEYCHORD_H_ */
+diff -Naur g2-2.6.36/include/linux/keyreset.h merged-2.6.36/include/linux/keyreset.h
+--- g2-2.6.36/include/linux/keyreset.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/keyreset.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,28 @@
++/*
++ * include/linux/keyreset.h - platform data structure for resetkeys driver
++ *
++ * Copyright (C) 2008 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_KEYRESET_H
++#define _LINUX_KEYRESET_H
++
++#define KEYRESET_NAME "keyreset"
++
++struct keyreset_platform_data {
++	int (*reset_fn)(void);
++	int *keys_up;
++	int keys_down[]; /* 0 terminated */
++};
++
++#endif /* _LINUX_KEYRESET_H */
+diff -Naur g2-2.6.36/include/linux/mmc/card.h merged-2.6.36/include/linux/mmc/card.h
+--- g2-2.6.36/include/linux/mmc/card.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/mmc/card.h	2011-08-09 08:49:41.000000000 -0700
+@@ -11,6 +11,7 @@
+ #define LINUX_MMC_CARD_H
+ 
+ #include <linux/mmc/core.h>
++#include <linux/mod_devicetable.h>
+ 
+ struct mmc_cid {
+ 	unsigned int		manfid;
+@@ -119,6 +120,7 @@
+ 						/* for byte mode */
+ #define MMC_QUIRK_NONSTD_SDIO	(1<<2)		/* non-standard SDIO card attached */
+ 						/* (missing CIA registers) */
++#define MMC_QUIRK_INAND_CMD38	(1<<3)		/* iNAND devices have broken CMD38 */
+ 
+ 	unsigned int		erase_size;	/* erase size in sectors */
+  	unsigned int		erase_shift;	/* if erase unit is power 2 */
+@@ -146,6 +148,94 @@
+ 	struct dentry		*debugfs_root;
+ };
+ 
++/*
++ *  The world is not perfect and supplies us with broken mmc/sdio devices.
++ *  For at least a part of these bugs we need a work-around
++ */
++
++struct mmc_fixup {
++
++	/* CID-specific fields. */
++	const char *name;
++
++	/* Valid revision range */
++	u64 rev_start, rev_end;
++
++	unsigned int manfid;
++	unsigned short oemid;
++
++       /* SDIO-specfic fields. You can use SDIO_ANY_ID here of course */
++	u16 cis_vendor, cis_device;
++
++	void (*vendor_fixup)(struct mmc_card *card, int data);
++	int data;
++};
++
++#define CID_MANFID_ANY (-1ul)
++#define CID_OEMID_ANY ((unsigned short) -1)
++#define CID_NAME_ANY (NULL)
++
++#define END_FIXUP { 0 }
++
++#define _FIXUP_EXT(_name, _manfid, _oemid, _rev_start, _rev_end,	\
++		   _cis_vendor, _cis_device,				\
++		   _fixup, _data)					\
++	{						   \
++		.name = (_name),			   \
++		.manfid = (_manfid),			   \
++		.oemid = (_oemid),			   \
++		.rev_start = (_rev_start),		   \
++		.rev_end = (_rev_end),			   \
++		.cis_vendor = (_cis_vendor),		   \
++		.cis_device = (_cis_device),		   \
++		.vendor_fixup = (_fixup),		   \
++		.data = (_data),			   \
++	 }
++
++#define MMC_FIXUP_REV(_name, _manfid, _oemid, _rev_start, _rev_end,	\
++		      _fixup, _data)					\
++	_FIXUP_EXT(_name, _manfid,					\
++		   _oemid, _rev_start, _rev_end,			\
++		   SDIO_ANY_ID, SDIO_ANY_ID,				\
++		   _fixup, _data)					\
++
++#define MMC_FIXUP(_name, _manfid, _oemid, _fixup, _data) \
++	MMC_FIXUP_REV(_name, _manfid, _oemid, 0, -1ull, _fixup, _data)
++
++#define SDIO_FIXUP(_vendor, _device, _fixup, _data)			\
++	_FIXUP_EXT(CID_NAME_ANY, CID_MANFID_ANY,			\
++		    CID_OEMID_ANY, 0, -1ull,				\
++		   _vendor, _device,					\
++		   _fixup, _data)					\
++
++#define cid_rev(hwrev, fwrev, year, month)	\
++	(((u64) hwrev) << 40 |                  \
++	 ((u64) fwrev) << 32 |                  \
++	 ((u64) year) << 16 |                   \
++	 ((u64) month))
++
++#define cid_rev_card(card)		  \
++	cid_rev(card->cid.hwrev,	  \
++		    card->cid.fwrev,      \
++		    card->cid.year,	  \
++		    card->cid.month)
++
++/*
++ * This hook just adds a quirk unconditionnally
++ */
++static inline void __maybe_unused add_quirk(struct mmc_card *card, int data)
++{
++	card->quirks |= data;
++}
++
++/*
++ * This hook just removes a quirk unconditionnally
++ */
++static inline void __maybe_unused remove_quirk(struct mmc_card *card, int data)
++{
++	card->quirks &= ~data;
++}
++
+ #define mmc_card_mmc(c)		((c)->type == MMC_TYPE_MMC)
+ #define mmc_card_sd(c)		((c)->type == MMC_TYPE_SD)
+ #define mmc_card_sdio(c)	((c)->type == MMC_TYPE_SDIO)
+@@ -191,4 +281,7 @@
+ extern int mmc_register_driver(struct mmc_driver *);
+ extern void mmc_unregister_driver(struct mmc_driver *);
+ 
++extern void mmc_fixup_device(struct mmc_card *card,
++			     const struct mmc_fixup *table);
++
+ #endif
+diff -Naur g2-2.6.36/include/linux/mmc/core.h merged-2.6.36/include/linux/mmc/core.h
+--- g2-2.6.36/include/linux/mmc/core.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/mmc/core.h	2011-08-09 08:49:41.000000000 -0700
+@@ -135,6 +135,7 @@
+ extern int mmc_wait_for_cmd(struct mmc_host *, struct mmc_command *, int);
+ extern int mmc_wait_for_app_cmd(struct mmc_host *, struct mmc_card *,
+ 	struct mmc_command *, int);
++extern int mmc_switch(struct mmc_card *, u8, u8, u8);
+ 
+ #define MMC_ERASE_ARG		0x00000000
+ #define MMC_SECURE_ERASE_ARG	0x80000000
+diff -Naur g2-2.6.36/include/linux/mmc/host.h merged-2.6.36/include/linux/mmc/host.h
+--- g2-2.6.36/include/linux/mmc/host.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/mmc/host.h	2011-08-09 08:49:41.000000000 -0700
+@@ -202,6 +202,10 @@
+ 	const struct mmc_bus_ops *bus_ops;	/* current bus driver */
+ 	unsigned int		bus_refs;	/* reference counter */
+ 
++	unsigned int		bus_resume_flags;
++#define MMC_BUSRESUME_MANUAL_RESUME	(1 << 0)
++#define MMC_BUSRESUME_NEEDS_RESUME	(1 << 1)
++
+ 	unsigned int		sdio_irqs;
+ 	struct task_struct	*sdio_irq_thread;
+ 	atomic_t		sdio_irq_thread_abort;
+@@ -214,6 +218,15 @@
+ 
+ 	struct dentry		*debugfs_root;
+ 
++#ifdef CONFIG_MMC_EMBEDDED_SDIO
++	struct {
++		struct sdio_cis			*cis;
++		struct sdio_cccr		*cccr;
++		struct sdio_embedded_func	*funcs;
++		int				num_funcs;
++	} embedded_sdio_data;
++#endif
++
+ 	unsigned long		private[0] ____cacheline_aligned;
+ };
+ 
+@@ -222,6 +235,14 @@
+ extern void mmc_remove_host(struct mmc_host *);
+ extern void mmc_free_host(struct mmc_host *);
+ 
++#ifdef CONFIG_MMC_EMBEDDED_SDIO
++extern void mmc_set_embedded_sdio_data(struct mmc_host *host,
++				       struct sdio_cis *cis,
++				       struct sdio_cccr *cccr,
++				       struct sdio_embedded_func *funcs,
++				       int num_funcs);
++#endif
++
+ static inline void *mmc_priv(struct mmc_host *host)
+ {
+ 	return (void *)host->private;
+@@ -232,6 +253,18 @@
+ #define mmc_dev(x)	((x)->parent)
+ #define mmc_classdev(x)	(&(x)->class_dev)
+ #define mmc_hostname(x)	(dev_name(&(x)->class_dev))
++#define mmc_bus_needs_resume(host) ((host)->bus_resume_flags & MMC_BUSRESUME_NEEDS_RESUME)
++#define mmc_bus_manual_resume(host) ((host)->bus_resume_flags & MMC_BUSRESUME_MANUAL_RESUME)
++
++static inline void mmc_set_bus_resume_policy(struct mmc_host *host, int manual)
++{
++	if (manual)
++		host->bus_resume_flags |= MMC_BUSRESUME_MANUAL_RESUME;
++	else
++		host->bus_resume_flags &= ~MMC_BUSRESUME_MANUAL_RESUME;
++}
++
++extern int mmc_resume_bus(struct mmc_host *host);
+ 
+ extern int mmc_suspend_host(struct mmc_host *);
+ extern int mmc_resume_host(struct mmc_host *);
+diff -Naur g2-2.6.36/include/linux/mmc/pm.h merged-2.6.36/include/linux/mmc/pm.h
+--- g2-2.6.36/include/linux/mmc/pm.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/mmc/pm.h	2011-08-09 08:49:41.000000000 -0700
+@@ -26,5 +26,6 @@
+ 
+ #define MMC_PM_KEEP_POWER	(1 << 0)	/* preserve card power during suspend */
+ #define MMC_PM_WAKE_SDIO_IRQ	(1 << 1)	/* wake up host system on SDIO IRQ assertion */
++#define MMC_PM_IGNORE_PM_NOTIFY	(1 << 2)	/* ignore mmc pm notify */
+ 
+ #endif
+diff -Naur g2-2.6.36/include/linux/mmc/sdio_func.h merged-2.6.36/include/linux/mmc/sdio_func.h
+--- g2-2.6.36/include/linux/mmc/sdio_func.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/mmc/sdio_func.h	2011-08-09 08:49:41.000000000 -0700
+@@ -23,6 +23,14 @@
+ typedef void (sdio_irq_handler_t)(struct sdio_func *);
+ 
+ /*
++ * Structure used to hold embedded SDIO device data from platform layer
++ */
++struct sdio_embedded_func {
++	uint8_t f_class;
++	uint32_t f_maxblksize;
++};
++
++/*
+  * SDIO function CIS tuple (unknown to the core)
+  */
+ struct sdio_func_tuple {
+@@ -130,6 +138,8 @@
+ extern unsigned int sdio_align_size(struct sdio_func *func, unsigned int sz);
+ 
+ extern u8 sdio_readb(struct sdio_func *func, unsigned int addr, int *err_ret);
++extern u8 sdio_readb_ext(struct sdio_func *func, unsigned int addr, int *err_ret,
++	unsigned in);
+ extern u16 sdio_readw(struct sdio_func *func, unsigned int addr, int *err_ret);
+ extern u32 sdio_readl(struct sdio_func *func, unsigned int addr, int *err_ret);
+ 
+diff -Naur g2-2.6.36/include/linux/msdos_fs.h merged-2.6.36/include/linux/msdos_fs.h
+--- g2-2.6.36/include/linux/msdos_fs.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/linux/msdos_fs.h	2011-08-09 08:49:41.000000000 -0700
+@@ -101,6 +101,7 @@
+ /* <linux/videotext.h> has used 0x72 ('r') in collision, so skip a few */
+ #define FAT_IOCTL_GET_ATTRIBUTES	_IOR('r', 0x10, __u32)
+ #define FAT_IOCTL_SET_ATTRIBUTES	_IOW('r', 0x11, __u32)
++#define VFAT_IOCTL_GET_VOLUME_ID	_IOR('r', 0x12, __u32)
+ 
+ struct fat_boot_sector {
+ 	__u8	ignored[3];	/* Boot strap short or near jump */
+@@ -138,6 +139,17 @@
+ 	__le32   reserved2[4];
+ };
+ 
++struct fat_boot_bsx {
++	__u8     drive;		    /* drive number */
++	__u8     reserved1;
++	__u8     signature;	    /* extended boot signature */
++	__u8     vol_id[4];     /* volume ID */
++	__u8     vol_label[11]; /* volume label */
++	__u8     type[8];       /* file system type */
++};
++#define FAT16_BSX_OFFSET	36 /* offset of fat_boot_bsx in FAT12 and FAT16 */
++#define FAT32_BSX_OFFSET	64 /* offset of fat_boot_bsx in FAT32 */
++
+ struct msdos_dir_entry {
+ 	__u8	name[MSDOS_NAME];/* name and extension */
+ 	__u8	attr;		/* attribute bits */
+diff -Naur g2-2.6.36/include/linux/percpu_counter.h merged-2.6.36/include/linux/percpu_counter.h
+--- g2-2.6.36/include/linux/percpu_counter.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/percpu_counter.h	2011-08-09 08:49:41.000000000 -0700
+@@ -78,6 +78,11 @@
+ 	return 1;
+ }
+ 
++static inline int percpu_counter_initialized(struct percpu_counter *fbc)
++{
++	return (fbc->counters != NULL);
++}
++
+ #else
+ 
+ struct percpu_counter {
+@@ -143,6 +148,11 @@
+ 	return percpu_counter_read(fbc);
+ }
+ 
++static inline int percpu_counter_initialized(struct percpu_counter *fbc)
++{
++	return 1;
++}
++
+ #endif	/* CONFIG_SMP */
+ 
+ static inline void percpu_counter_inc(struct percpu_counter *fbc)
+diff -Naur g2-2.6.36/include/linux/poll.h merged-2.6.36/include/linux/poll.h
+--- g2-2.6.36/include/linux/poll.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/linux/poll.h	2011-08-09 08:49:41.000000000 -0700
+@@ -73,6 +73,8 @@
+ extern void poll_freewait(struct poll_wqueues *pwq);
+ extern int poll_schedule_timeout(struct poll_wqueues *pwq, int state,
+ 				 ktime_t *expires, unsigned long slack);
++extern long select_estimate_accuracy(struct timespec *tv);
++
+ 
+ static inline int poll_schedule(struct poll_wqueues *pwq, int state)
+ {
+diff -Naur g2-2.6.36/include/linux/power_supply.h merged-2.6.36/include/linux/power_supply.h
+--- g2-2.6.36/include/linux/power_supply.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/power_supply.h	2011-08-09 08:49:41.000000000 -0700
+@@ -14,6 +14,7 @@
+ #define __LINUX_POWER_SUPPLY_H__
+ 
+ #include <linux/device.h>
++#include <linux/wakelock.h>
+ #include <linux/workqueue.h>
+ #include <linux/leds.h>
+ 
+@@ -159,6 +160,9 @@
+ 	/* private */
+ 	struct device *dev;
+ 	struct work_struct changed_work;
++	spinlock_t changed_lock;
++	bool changed;
++	struct wake_lock work_wake_lock;
+ 
+ #ifdef CONFIG_LEDS_TRIGGERS
+ 	struct led_trigger *charging_full_trig;
+diff -Naur g2-2.6.36/include/linux/sched.h merged-2.6.36/include/linux/sched.h
+--- g2-2.6.36/include/linux/sched.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/sched.h	2011-08-09 08:49:41.000000000 -0700
+@@ -1073,6 +1073,7 @@
+ 
+ #ifdef CONFIG_FAIR_GROUP_SCHED
+ 	void (*moved_group) (struct task_struct *p, int on_rq);
++	void (*prep_move_group) (struct task_struct *p, int on_rq);
+ #endif
+ };
+ 
+@@ -1678,6 +1679,9 @@
+ extern void task_times(struct task_struct *p, cputime_t *ut, cputime_t *st);
+ extern void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *st);
+ 
++extern int task_free_register(struct notifier_block *n);
++extern int task_free_unregister(struct notifier_block *n);
++
+ /*
+  * Per process flags
+  */
+diff -Naur g2-2.6.36/include/linux/serial_core.h merged-2.6.36/include/linux/serial_core.h
+--- g2-2.6.36/include/linux/serial_core.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/serial_core.h	2011-08-09 08:49:41.000000000 -0700
+@@ -234,6 +234,7 @@
+ 	void		(*pm)(struct uart_port *, unsigned int state,
+ 			      unsigned int oldstate);
+ 	int		(*set_wake)(struct uart_port *, unsigned int state);
++	void		(*wake_peer)(struct uart_port *);
+ 
+ 	/*
+ 	 * Return a string describing the type of the port
+diff -Naur g2-2.6.36/include/linux/sockios.h merged-2.6.36/include/linux/sockios.h
+--- g2-2.6.36/include/linux/sockios.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/linux/sockios.h	2011-08-09 08:49:41.000000000 -0700
+@@ -65,6 +65,7 @@
+ #define SIOCDIFADDR	0x8936		/* delete PA address		*/
+ #define	SIOCSIFHWBROADCAST	0x8937	/* set hardware broadcast addr	*/
+ #define SIOCGIFCOUNT	0x8938		/* get number of devices */
++#define SIOCKILLADDR	0x8939		/* kill sockets with this local addr */
+ 
+ #define SIOCGIFBR	0x8940		/* Bridging support		*/
+ #define SIOCSIFBR	0x8941		/* Set bridging options 	*/
+diff -Naur g2-2.6.36/include/linux/switch.h merged-2.6.36/include/linux/switch.h
+--- g2-2.6.36/include/linux/switch.h	2011-08-09 08:33:08.000000000 -0700
++++ merged-2.6.36/include/linux/switch.h	2011-08-09 08:49:41.000000000 -0700
+@@ -1,201 +1,53 @@
+ /*
+- * switch.h: Switch configuration API
++ *  Switch class driver
+  *
+- * Copyright (C) 2008 Felix Fietkau <nbd@openwrt.org>
++ * Copyright (C) 2008 Google, Inc.
++ * Author: Mike Lockwood <lockwood@android.com>
+  *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+- */
+-
+-#ifndef __LINUX_SWITCH_H
+-#define __LINUX_SWITCH_H
+-
+-#include <linux/types.h>
+-#include <linux/netdevice.h>
+-#include <linux/netlink.h>
+-#include <linux/genetlink.h>
+-#ifndef __KERNEL__
+-#include <netlink/netlink.h>
+-#include <netlink/genl/genl.h>
+-#include <netlink/genl/ctrl.h>
+-#else
+-#include <net/genetlink.h>
+-#endif
+-
+-/* main attributes */
+-enum {
+-	SWITCH_ATTR_UNSPEC,
+-	/* global */
+-	SWITCH_ATTR_TYPE,
+-	/* device */
+-	SWITCH_ATTR_ID,
+-	SWITCH_ATTR_NAME,
+-	SWITCH_ATTR_DEV_NAME,
+-	SWITCH_ATTR_VLANS,
+-	SWITCH_ATTR_PORTS,
+-	SWITCH_ATTR_CPU_PORT,
+-	/* attributes */
+-	SWITCH_ATTR_OP_ID,
+-	SWITCH_ATTR_OP_TYPE,
+-	SWITCH_ATTR_OP_NAME,
+-	SWITCH_ATTR_OP_PORT,
+-	SWITCH_ATTR_OP_VLAN,
+-	SWITCH_ATTR_OP_VALUE_INT,
+-	SWITCH_ATTR_OP_VALUE_STR,
+-	SWITCH_ATTR_OP_VALUE_PORTS,
+-	SWITCH_ATTR_OP_DESCRIPTION,
+-	/* port lists */
+-	SWITCH_ATTR_PORT,
+-	SWITCH_ATTR_MAX
+-};
+-
+-/* commands */
+-enum {
+-	SWITCH_CMD_UNSPEC,
+-	SWITCH_CMD_GET_SWITCH,
+-	SWITCH_CMD_NEW_ATTR,
+-	SWITCH_CMD_LIST_GLOBAL,
+-	SWITCH_CMD_GET_GLOBAL,
+-	SWITCH_CMD_SET_GLOBAL,
+-	SWITCH_CMD_LIST_PORT,
+-	SWITCH_CMD_GET_PORT,
+-	SWITCH_CMD_SET_PORT,
+-	SWITCH_CMD_LIST_VLAN,
+-	SWITCH_CMD_GET_VLAN,
+-	SWITCH_CMD_SET_VLAN
+-};
+-
+-/* data types */
+-enum switch_val_type {
+-	SWITCH_TYPE_UNSPEC,
+-	SWITCH_TYPE_INT,
+-	SWITCH_TYPE_STRING,
+-	SWITCH_TYPE_PORTS,
+-	SWITCH_TYPE_NOVAL,
+-};
+-
+-/* port nested attributes */
+-enum {
+-	SWITCH_PORT_UNSPEC,
+-	SWITCH_PORT_ID,
+-	SWITCH_PORT_FLAG_TAGGED,
+-	SWITCH_PORT_ATTR_MAX
+-};
+-
+-#define SWITCH_ATTR_DEFAULTS_OFFSET	0x1000
+-
+-#ifdef __KERNEL__
+-
+-struct switch_dev;
+-struct switch_op;
+-struct switch_val;
+-struct switch_attr;
+-struct switch_attrlist;
+-
+-int register_switch(struct switch_dev *dev, struct net_device *netdev);
+-void unregister_switch(struct switch_dev *dev);
+-
+-/**
+- * struct switch_attrlist - attribute list
+  *
+- * @n_attr: number of attributes
+- * @attr: pointer to the attributes array
+- */
+-struct switch_attrlist {
+-	int n_attr;
+-	const struct switch_attr *attr;
+-};
++*/
+ 
+-/**
+- * struct switch_dev_ops - switch driver operations
+- *
+- * @attr_global: global switch attribute list
+- * @attr_port: port attribute list
+- * @attr_vlan: vlan attribute list
+- *
+- * Callbacks:
+- *
+- * @get_vlan_ports: read the port list of a VLAN
+- * @set_vlan_ports: set the port list of a VLAN
+- *
+- * @get_port_pvid: get the primary VLAN ID of a port
+- * @set_port_pvid: set the primary VLAN ID of a port
+- *
+- * @apply_config: apply all changed settings to the switch
+- * @reset_switch: resetting the switch
+- */
+-struct switch_dev_ops {
+-	struct switch_attrlist attr_global, attr_port, attr_vlan;
+-
+-	int (*get_vlan_ports)(struct switch_dev *dev, struct switch_val *val);
+-	int (*set_vlan_ports)(struct switch_dev *dev, struct switch_val *val);
+-
+-	int (*get_port_pvid)(struct switch_dev *dev, int port, int *val);
+-	int (*set_port_pvid)(struct switch_dev *dev, int port, int val);
+-
+-	int (*apply_config)(struct switch_dev *dev);
+-	int (*reset_switch)(struct switch_dev *dev);
+-};
++#ifndef __LINUX_SWITCH_H__
++#define __LINUX_SWITCH_H__
+ 
+ struct switch_dev {
+-	const struct switch_dev_ops *ops;
+-	const char *name;
+-
+-	/* NB: either devname or netdev must be set */
+-	const char *devname;
+-	struct net_device *netdev;
+-
+-	int ports;
+-	int vlans;
+-	int cpu_port;
+-
+-	/* the following fields are internal for swconfig */
+-	int id;
+-	struct list_head dev_list;
+-	unsigned long def_global, def_port, def_vlan;
++	const char	*name;
++	struct device	*dev;
++	int		index;
++	int		state;
+ 
+-	spinlock_t lock;
+-	struct switch_port *portbuf;
++	ssize_t	(*print_name)(struct switch_dev *sdev, char *buf);
++	ssize_t	(*print_state)(struct switch_dev *sdev, char *buf);
+ };
+ 
+-struct switch_port {
+-	u32 id;
+-	u32 flags;
+-};
++struct gpio_switch_platform_data {
++	const char *name;
++	unsigned 	gpio;
+ 
+-struct switch_val {
+-	const struct switch_attr *attr;
+-	int port_vlan;
+-	int len;
+-	union {
+-		const char *s;
+-		u32 i;
+-		struct switch_port *ports;
+-	} value;
++	/* if NULL, switch_dev.name will be printed */
++	const char *name_on;
++	const char *name_off;
++	/* if NULL, "0" or "1" will be printed */
++	const char *state_on;
++	const char *state_off;
+ };
+ 
+-struct switch_attr {
+-	int disabled;
+-	int type;
+-	const char *name;
+-	const char *description;
+-
+-	int (*set)(struct switch_dev *dev, const struct switch_attr *attr, struct switch_val *val);
+-	int (*get)(struct switch_dev *dev, const struct switch_attr *attr, struct switch_val *val);
++extern int switch_dev_register(struct switch_dev *sdev);
++extern void switch_dev_unregister(struct switch_dev *sdev);
+ 
+-	/* for driver internal use */
+-	int id;
+-	int ofs;
+-	int max;
+-};
++static inline int switch_get_state(struct switch_dev *sdev)
++{
++	return sdev->state;
++}
+ 
+-#endif
++extern void switch_set_state(struct switch_dev *sdev, int state);
+ 
+-#endif
++#endif /* __LINUX_SWITCH_H__ */
+diff -Naur g2-2.6.36/include/linux/synaptics_i2c_rmi.h merged-2.6.36/include/linux/synaptics_i2c_rmi.h
+--- g2-2.6.36/include/linux/synaptics_i2c_rmi.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/synaptics_i2c_rmi.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,55 @@
++/*
++ * include/linux/synaptics_i2c_rmi.h - platform data structure for f75375s sensor
++ *
++ * Copyright (C) 2008 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_SYNAPTICS_I2C_RMI_H
++#define _LINUX_SYNAPTICS_I2C_RMI_H
++
++#define SYNAPTICS_I2C_RMI_NAME "synaptics-rmi-ts"
++
++enum {
++	SYNAPTICS_FLIP_X = 1UL << 0,
++	SYNAPTICS_FLIP_Y = 1UL << 1,
++	SYNAPTICS_SWAP_XY = 1UL << 2,
++	SYNAPTICS_SNAP_TO_INACTIVE_EDGE = 1UL << 3,
++};
++
++struct synaptics_i2c_rmi_platform_data {
++	uint32_t version;	/* Use this entry for panels with */
++				/* (major << 8 | minor) version or above. */
++				/* If non-zero another array entry follows */
++	int (*power)(int on);	/* Only valid in first array entry */
++	uint32_t flags;
++	unsigned long irqflags;
++	uint32_t inactive_left; /* 0x10000 = screen width */
++	uint32_t inactive_right; /* 0x10000 = screen width */
++	uint32_t inactive_top; /* 0x10000 = screen height */
++	uint32_t inactive_bottom; /* 0x10000 = screen height */
++	uint32_t snap_left_on; /* 0x10000 = screen width */
++	uint32_t snap_left_off; /* 0x10000 = screen width */
++	uint32_t snap_right_on; /* 0x10000 = screen width */
++	uint32_t snap_right_off; /* 0x10000 = screen width */
++	uint32_t snap_top_on; /* 0x10000 = screen height */
++	uint32_t snap_top_off; /* 0x10000 = screen height */
++	uint32_t snap_bottom_on; /* 0x10000 = screen height */
++	uint32_t snap_bottom_off; /* 0x10000 = screen height */
++	uint32_t fuzz_x; /* 0x10000 = screen width */
++	uint32_t fuzz_y; /* 0x10000 = screen height */
++	int fuzz_p;
++	int fuzz_w;
++	int8_t sensitivity_adjust;
++};
++
++#endif /* _LINUX_SYNAPTICS_I2C_RMI_H */
+diff -Naur g2-2.6.36/include/linux/uid_stat.h merged-2.6.36/include/linux/uid_stat.h
+--- g2-2.6.36/include/linux/uid_stat.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/uid_stat.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,29 @@
++/* include/linux/uid_stat.h
++ *
++ * Copyright (C) 2008-2009 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __uid_stat_h
++#define __uid_stat_h
++
++/* Contains definitions for resource tracking per uid. */
++
++#ifdef CONFIG_UID_STAT
++int uid_stat_tcp_snd(uid_t uid, int size);
++int uid_stat_tcp_rcv(uid_t uid, int size);
++#else
++#define uid_stat_tcp_snd(uid, size) do {} while (0);
++#define uid_stat_tcp_rcv(uid, size) do {} while (0);
++#endif
++
++#endif /* _LINUX_UID_STAT_H */
+diff -Naur g2-2.6.36/include/linux/usb/android_composite.h merged-2.6.36/include/linux/usb/android_composite.h
+--- g2-2.6.36/include/linux/usb/android_composite.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/usb/android_composite.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,106 @@
++/*
++ * Platform data for Android USB
++ *
++ * Copyright (C) 2008 Google, Inc.
++ * Author: Mike Lockwood <lockwood@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#ifndef	__LINUX_USB_ANDROID_H
++#define	__LINUX_USB_ANDROID_H
++
++#include <linux/usb/composite.h>
++#include <linux/if_ether.h>
++
++struct android_usb_function {
++	struct list_head	list;
++	char			*name;
++	int 			(*bind_config)(struct usb_configuration *c);
++};
++
++struct android_usb_product {
++	/* Vendor ID for this set of functions.
++	 * Default vendor_id in platform data will be used if this is zero.
++	 */
++	__u16 vendor_id;
++
++	/* Product ID for this set of functions. */
++	__u16 product_id;
++
++	/* List of function names associated with this product.
++	 * This is used to compute the USB product ID dynamically
++	 * based on which functions are enabled.
++	 */
++	int num_functions;
++	char **functions;
++};
++
++struct android_usb_platform_data {
++	/* USB device descriptor fields */
++	__u16 vendor_id;
++
++	/* Default product ID. */
++	__u16 product_id;
++
++	__u16 version;
++
++	char *product_name;
++	char *manufacturer_name;
++	char *serial_number;
++
++	/* List of available USB products.
++	 * This is used to compute the USB product ID dynamically
++	 * based on which functions are enabled.
++	 * if num_products is zero or no match can be found,
++	 * we use the default product ID
++	 */
++	int num_products;
++	struct android_usb_product *products;
++
++	/* List of all supported USB functions.
++	 * This list is used to define the order in which
++	 * the functions appear in the configuration's list of USB interfaces.
++	 * This is necessary to avoid depending upon the order in which
++	 * the individual function drivers are initialized.
++	 */
++	int num_functions;
++	char **functions;
++};
++
++/* Platform data for "usb_mass_storage" driver. */
++struct usb_mass_storage_platform_data {
++	/* Contains values for the SC_INQUIRY SCSI command. */
++	char *vendor;
++	char *product;
++	int release;
++
++	/* number of LUNS */
++	int nluns;
++};
++
++/* Platform data for USB ethernet driver. */
++struct usb_ether_platform_data {
++	u8	ethaddr[ETH_ALEN];
++	u32	vendorID;
++	const char *vendorDescr;
++};
++
++/* Platform data for ACM driver. */
++struct acm_platform_data {
++	u8	num_inst;
++};
++
++extern void android_register_function(struct android_usb_function *f);
++
++extern void android_enable_function(struct usb_function *f, int enable);
++
++
++#endif	/* __LINUX_USB_ANDROID_H */
+diff -Naur g2-2.6.36/include/linux/usb/composite.h merged-2.6.36/include/linux/usb/composite.h
+--- g2-2.6.36/include/linux/usb/composite.h	2011-08-09 08:24:39.000000000 -0700
++++ merged-2.6.36/include/linux/usb/composite.h	2011-08-09 08:49:41.000000000 -0700
+@@ -36,8 +36,10 @@
+ 
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
++#include <linux/switch.h>
+ 
+ 
++struct usb_composite_dev;
+ struct usb_configuration;
+ 
+ /**
+@@ -101,6 +103,9 @@
+ 
+ 	struct usb_configuration	*config;
+ 
++	/* disabled is zero if the function is enabled */
++	int				disabled;
++
+ 	/* REVISIT:  bind() functions can be marked __init, which
+ 	 * makes trouble for section mismatch analysis.  See if
+ 	 * we can't restructure things to avoid mismatching.
+@@ -128,6 +133,7 @@
+ 	/* internals */
+ 	struct list_head		list;
+ 	DECLARE_BITMAP(endpoints, 32);
++	struct device			*dev;
+ };
+ 
+ int usb_add_function(struct usb_configuration *, struct usb_function *);
+@@ -137,6 +143,9 @@
+ 
+ int usb_interface_id(struct usb_configuration *, struct usb_function *);
+ 
++void usb_function_set_enabled(struct usb_function *, int);
++void usb_composite_force_reset(struct usb_composite_dev *);
++
+ /**
+  * ep_choose - select descriptor endpoint at current device speed
+  * @g: gadget, connected and running at some speed
+@@ -269,6 +278,9 @@
+ 	const struct usb_device_descriptor	*dev;
+ 	struct usb_gadget_strings		**strings;
+ 
++	struct class		*class;
++	atomic_t		function_count;
++
+ 	/* REVISIT:  bind() functions can be marked __init, which
+ 	 * makes trouble for section mismatch analysis.  See if
+ 	 * we can't restructure things to avoid mismatching...
+@@ -282,6 +294,8 @@
+ 	/* global suspend hooks */
+ 	void			(*suspend)(struct usb_composite_dev *);
+ 	void			(*resume)(struct usb_composite_dev *);
++
++	void			(*enable_function)(struct usb_function *f, int enable);
+ };
+ 
+ extern int usb_composite_register(struct usb_composite_driver *);
+@@ -342,6 +356,15 @@
+ 
+ 	/* protects at least deactivation count */
+ 	spinlock_t			lock;
++
++	/* switch indicating connected/disconnected state */
++	struct switch_dev		sw_connected;
++	/* switch indicating current configuration */
++	struct switch_dev		sw_config;
++	/* current connected state for sw_connected */
++	bool				connected;
++
++	struct work_struct switch_work;
+ };
+ 
+ extern int usb_string_id(struct usb_composite_dev *c);
+diff -Naur g2-2.6.36/include/linux/usb/f_mtp.h merged-2.6.36/include/linux/usb/f_mtp.h
+--- g2-2.6.36/include/linux/usb/f_mtp.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/usb/f_mtp.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,53 @@
++/*
++ * Gadget Function Driver for MTP
++ *
++ * Copyright (C) 2010 Google, Inc.
++ * Author: Mike Lockwood <lockwood@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __LINUX_USB_F_MTP_H
++#define __LINUX_USB_F_MTP_H
++
++/* Constants for MTP_SET_INTERFACE_MODE */
++#define MTP_INTERFACE_MODE_MTP  0
++#define MTP_INTERFACE_MODE_PTP  1
++
++
++struct mtp_file_range {
++	/* file descriptor for file to transfer */
++	int			fd;
++	/* offset in file for start of transfer */
++	loff_t  	offset;
++	/* number of bytes to transfer */
++	int64_t		length;
++};
++
++struct mtp_event {
++	/* size of the event */
++	size_t		length;
++	/* event data to send */
++	void  		*data;
++};
++
++/* Sends the specified file range to the host */
++#define MTP_SEND_FILE              _IOW('M', 0, struct mtp_file_range)
++/* Receives data from the host and writes it to a file.
++ * The file is created if it does not exist.
++ */
++#define MTP_RECEIVE_FILE           _IOW('M', 1, struct mtp_file_range)
++/* Sets the driver mode to either MTP or PTP */
++#define MTP_SET_INTERFACE_MODE     _IOW('M', 2, int)
++/* Sends an event to the host via the interrupt endpoint */
++#define MTP_SEND_EVENT             _IOW('M', 3, struct mtp_event)
++
++#endif /* __LINUX_USB_F_MTP_H */
+diff -Naur g2-2.6.36/include/linux/wakelock.h merged-2.6.36/include/linux/wakelock.h
+--- g2-2.6.36/include/linux/wakelock.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/wakelock.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,91 @@
++/* include/linux/wakelock.h
++ *
++ * Copyright (C) 2007-2008 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _LINUX_WAKELOCK_H
++#define _LINUX_WAKELOCK_H
++
++#include <linux/list.h>
++#include <linux/ktime.h>
++
++/* A wake_lock prevents the system from entering suspend or other low power
++ * states when active. If the type is set to WAKE_LOCK_SUSPEND, the wake_lock
++ * prevents a full system suspend. If the type is WAKE_LOCK_IDLE, low power
++ * states that cause large interrupt latencies or that disable a set of
++ * interrupts will not entered from idle until the wake_locks are released.
++ */
++
++enum {
++	WAKE_LOCK_SUSPEND, /* Prevent suspend */
++	WAKE_LOCK_IDLE,    /* Prevent low power idle */
++	WAKE_LOCK_TYPE_COUNT
++};
++
++struct wake_lock {
++#ifdef CONFIG_HAS_WAKELOCK
++	struct list_head    link;
++	int                 flags;
++	const char         *name;
++	unsigned long       expires;
++#ifdef CONFIG_WAKELOCK_STAT
++	struct {
++		int             count;
++		int             expire_count;
++		int             wakeup_count;
++		ktime_t         total_time;
++		ktime_t         prevent_suspend_time;
++		ktime_t         max_time;
++		ktime_t         last_time;
++	} stat;
++#endif
++#endif
++};
++
++#ifdef CONFIG_HAS_WAKELOCK
++
++void wake_lock_init(struct wake_lock *lock, int type, const char *name);
++void wake_lock_destroy(struct wake_lock *lock);
++void wake_lock(struct wake_lock *lock);
++void wake_lock_timeout(struct wake_lock *lock, long timeout);
++void wake_unlock(struct wake_lock *lock);
++
++/* wake_lock_active returns a non-zero value if the wake_lock is currently
++ * locked. If the wake_lock has a timeout, it does not check the timeout
++ * but if the timeout had aready been checked it will return 0.
++ */
++int wake_lock_active(struct wake_lock *lock);
++
++/* has_wake_lock returns 0 if no wake locks of the specified type are active,
++ * and non-zero if one or more wake locks are held. Specifically it returns
++ * -1 if one or more wake locks with no timeout are active or the
++ * number of jiffies until all active wake locks time out.
++ */
++long has_wake_lock(int type);
++
++#else
++
++static inline void wake_lock_init(struct wake_lock *lock, int type,
++					const char *name) {}
++static inline void wake_lock_destroy(struct wake_lock *lock) {}
++static inline void wake_lock(struct wake_lock *lock) {}
++static inline void wake_lock_timeout(struct wake_lock *lock, long timeout) {}
++static inline void wake_unlock(struct wake_lock *lock) {}
++
++static inline int wake_lock_active(struct wake_lock *lock) { return 0; }
++static inline long has_wake_lock(int type) { return 0; }
++
++#endif
++
++#endif
++
+diff -Naur g2-2.6.36/include/linux/wifi_tiwlan.h merged-2.6.36/include/linux/wifi_tiwlan.h
+--- g2-2.6.36/include/linux/wifi_tiwlan.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/wifi_tiwlan.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,27 @@
++/* include/linux/wifi_tiwlan.h
++ *
++ * Copyright (C) 2008 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#ifndef _LINUX_WIFI_TIWLAN_H_
++#define _LINUX_WIFI_TIWLAN_H_
++
++#include <linux/wlan_plat.h>
++
++#define WMPA_NUMBER_OF_SECTIONS	3
++#define WMPA_NUMBER_OF_BUFFERS	160
++#define WMPA_SECTION_HEADER	24
++#define WMPA_SECTION_SIZE_0	(WMPA_NUMBER_OF_BUFFERS * 64)
++#define WMPA_SECTION_SIZE_1	(WMPA_NUMBER_OF_BUFFERS * 256)
++#define WMPA_SECTION_SIZE_2	(WMPA_NUMBER_OF_BUFFERS * 2048)
++
++#endif
+diff -Naur g2-2.6.36/include/linux/wl127x-rfkill.h merged-2.6.36/include/linux/wl127x-rfkill.h
+--- g2-2.6.36/include/linux/wl127x-rfkill.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/wl127x-rfkill.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,35 @@
++/*
++ * Bluetooth TI wl127x rfkill power control via GPIO
++ *
++ * Copyright (C) 2009 Motorola, Inc.
++ * Copyright (C) 2008 Texas Instruments
++ * Initial code: Pavan Savoy <pavan.savoy@gmail.com> (wl127x_power.c)
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; if not, write to the Free Software
++ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#ifndef _LINUX_WL127X_RFKILL_H
++#define _LINUX_WL127X_RFKILL_H
++
++#include <linux/rfkill.h>
++
++struct wl127x_rfkill_platform_data {
++	int nshutdown_gpio;
++
++	struct rfkill *rfkill;  /* for driver only */
++};
++
++#endif
+diff -Naur g2-2.6.36/include/linux/wlan_plat.h merged-2.6.36/include/linux/wlan_plat.h
+--- g2-2.6.36/include/linux/wlan_plat.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/linux/wlan_plat.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,27 @@
++/* include/linux/wlan_plat.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#ifndef _LINUX_WLAN_PLAT_H_
++#define _LINUX_WLAN_PLAT_H_
++
++struct wifi_platform_data {
++	int (*set_power)(int val);
++	int (*set_reset)(int val);
++	int (*set_carddetect)(int val);
++	void *(*mem_prealloc)(int section, unsigned long size);
++	int (*get_mac_addr)(unsigned char *buf);
++	void *(*get_country_code)(char *ccode);
++};
++
++#endif
+diff -Naur g2-2.6.36/include/net/activity_stats.h merged-2.6.36/include/net/activity_stats.h
+--- g2-2.6.36/include/net/activity_stats.h	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/include/net/activity_stats.h	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Author: Mike Chan (mike@android.com)
++ */
++
++#ifndef __activity_stats_h
++#define __activity_stats_h
++
++#ifdef CONFIG_NET_ACTIVITY_STATS
++void activity_stats_update(void);
++#else
++#define activity_stats_update(void) {}
++#endif
++
++#endif /* _NET_ACTIVITY_STATS_H */
+diff -Naur g2-2.6.36/include/net/bluetooth/bluetooth.h merged-2.6.36/include/net/bluetooth/bluetooth.h
+--- g2-2.6.36/include/net/bluetooth/bluetooth.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/net/bluetooth/bluetooth.h	2011-08-09 08:49:41.000000000 -0700
+@@ -64,6 +64,11 @@
+ 
+ #define BT_DEFER_SETUP	7
+ 
++#define BT_POWER	8
++struct bt_power {
++	__u8 force_active;
++};
++
+ #define BT_INFO(fmt, arg...) printk(KERN_INFO "Bluetooth: " fmt "\n" , ## arg)
+ #define BT_ERR(fmt, arg...)  printk(KERN_ERR "%s: " fmt "\n" , __func__ , ## arg)
+ #define BT_DBG(fmt, arg...)  pr_debug("%s: " fmt "\n" , __func__ , ## arg)
+@@ -142,6 +147,7 @@
+ 	__u8 tx_seq;
+ 	__u8 retries;
+ 	__u8 sar;
++	__u8 force_active;
+ };
+ #define bt_cb(skb) ((struct bt_skb_cb *)((skb)->cb))
+ 
+diff -Naur g2-2.6.36/include/net/bluetooth/hci.h merged-2.6.36/include/net/bluetooth/hci.h
+--- g2-2.6.36/include/net/bluetooth/hci.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/net/bluetooth/hci.h	2011-08-09 08:49:41.000000000 -0700
+@@ -146,15 +146,20 @@
+ #define ESCO_2EV5	0x0100
+ #define ESCO_3EV5	0x0200
+ 
+-#define SCO_ESCO_MASK  (ESCO_HV1 | ESCO_HV2 | ESCO_HV3)
+-#define EDR_ESCO_MASK  (ESCO_2EV3 | ESCO_3EV3 | ESCO_2EV5 | ESCO_3EV5)
++#define SCO_ESCO_MASK	(ESCO_HV1 | ESCO_HV2 | ESCO_HV3)
++#define EDR_ESCO_MASK	(ESCO_2EV3 | ESCO_3EV3 | ESCO_2EV5 | ESCO_3EV5)
++#define ALL_ESCO_MASK	(SCO_ESCO_MASK | ESCO_EV3 | ESCO_EV4 | ESCO_EV5 | \
++			EDR_ESCO_MASK)
+ 
+ /* ACL flags */
++#define ACL_START_NO_FLUSH	0x00
+ #define ACL_CONT		0x01
+ #define ACL_START		0x02
+ #define ACL_ACTIVE_BCAST	0x04
+ #define ACL_PICO_BCAST		0x08
+ 
++#define ACL_PB_MASK	(ACL_CONT | ACL_START)
++
+ /* Baseband links */
+ #define SCO_LINK	0x00
+ #define ACL_LINK	0x01
+@@ -193,6 +198,7 @@
+ #define LMP_EDR_ESCO_3M	0x40
+ #define LMP_EDR_3S_ESCO	0x80
+ 
++#define LMP_NO_FLUSH	0x01
+ #define LMP_SIMPLE_PAIR	0x08
+ 
+ /* Connection modes */
+@@ -998,6 +1004,9 @@
+ 	__u8     out;
+ 	__u16    state;
+ 	__u32    link_mode;
++	__u32    mtu;
++	__u32    cnt;
++	__u32    pkts;
+ };
+ 
+ struct hci_dev_req {
+diff -Naur g2-2.6.36/include/net/bluetooth/hci_core.h merged-2.6.36/include/net/bluetooth/hci_core.h
+--- g2-2.6.36/include/net/bluetooth/hci_core.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/net/bluetooth/hci_core.h	2011-08-09 08:49:41.000000000 -0700
+@@ -339,18 +339,21 @@
+ void hci_setup_sync(struct hci_conn *conn, __u16 handle);
+ void hci_sco_setup(struct hci_conn *conn, __u8 status);
+ 
+-struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst);
++struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
++					__u16 pkt_type, bdaddr_t *dst);
+ int hci_conn_del(struct hci_conn *conn);
+ void hci_conn_hash_flush(struct hci_dev *hdev);
+ void hci_conn_check_pending(struct hci_dev *hdev);
+ 
+-struct hci_conn *hci_connect(struct hci_dev *hdev, int type, bdaddr_t *dst, __u8 sec_level, __u8 auth_type);
++struct hci_conn *hci_connect(struct hci_dev *hdev, int type,
++					__u16 pkt_type, bdaddr_t *dst,
++					__u8 sec_level, __u8 auth_type);
+ int hci_conn_check_link_mode(struct hci_conn *conn);
+ int hci_conn_security(struct hci_conn *conn, __u8 sec_level, __u8 auth_type);
+ int hci_conn_change_link_key(struct hci_conn *conn);
+ int hci_conn_switch_role(struct hci_conn *conn, __u8 role);
+ 
+-void hci_conn_enter_active_mode(struct hci_conn *conn);
++void hci_conn_enter_active_mode(struct hci_conn *conn, __u8 force_active);
+ void hci_conn_enter_sniff_mode(struct hci_conn *conn);
+ 
+ void hci_conn_hold_device(struct hci_conn *conn);
+@@ -371,7 +374,7 @@
+ 			if (conn->state == BT_CONNECTED) {
+ 				timeo = msecs_to_jiffies(conn->disc_timeout);
+ 				if (!conn->out)
+-					timeo *= 2;
++					timeo *= 20;
+ 			} else
+ 				timeo = msecs_to_jiffies(10);
+ 		} else
+@@ -456,6 +459,7 @@
+ #define lmp_sniffsubr_capable(dev) ((dev)->features[5] & LMP_SNIFF_SUBR)
+ #define lmp_esco_capable(dev)      ((dev)->features[3] & LMP_ESCO)
+ #define lmp_ssp_capable(dev)       ((dev)->features[6] & LMP_SIMPLE_PAIR)
++#define lmp_no_flush_capable(dev)  ((dev)->features[6] & LMP_NO_FLUSH)
+ 
+ /* ----- HCI protocols ----- */
+ struct hci_proto {
+diff -Naur g2-2.6.36/include/net/bluetooth/l2cap.h merged-2.6.36/include/net/bluetooth/l2cap.h
+--- g2-2.6.36/include/net/bluetooth/l2cap.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/net/bluetooth/l2cap.h	2011-08-09 08:49:41.000000000 -0700
+@@ -75,6 +75,7 @@
+ #define L2CAP_LM_TRUSTED	0x0008
+ #define L2CAP_LM_RELIABLE	0x0010
+ #define L2CAP_LM_SECURE		0x0020
++#define L2CAP_LM_FLUSHABLE	0x0040
+ 
+ /* L2CAP command codes */
+ #define L2CAP_COMMAND_REJ	0x01
+@@ -327,6 +328,8 @@
+ 	__u8		sec_level;
+ 	__u8		role_switch;
+ 	__u8		force_reliable;
++	__u8		flushable;
++	__u8		force_active;
+ 
+ 	__u8		conf_req[64];
+ 	__u8		conf_len;
+diff -Naur g2-2.6.36/include/net/bluetooth/rfcomm.h merged-2.6.36/include/net/bluetooth/rfcomm.h
+--- g2-2.6.36/include/net/bluetooth/rfcomm.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/net/bluetooth/rfcomm.h	2011-08-09 08:49:41.000000000 -0700
+@@ -29,7 +29,6 @@
+ #define RFCOMM_CONN_TIMEOUT (HZ * 30)
+ #define RFCOMM_DISC_TIMEOUT (HZ * 20)
+ #define RFCOMM_AUTH_TIMEOUT (HZ * 25)
+-#define RFCOMM_IDLE_TIMEOUT (HZ * 2)
+ 
+ #define RFCOMM_DEFAULT_MTU	127
+ #define RFCOMM_DEFAULT_CREDITS	7
+@@ -155,7 +154,6 @@
+ struct rfcomm_session {
+ 	struct list_head list;
+ 	struct socket   *sock;
+-	struct timer_list timer;
+ 	unsigned long    state;
+ 	unsigned long    flags;
+ 	atomic_t         refcnt;
+diff -Naur g2-2.6.36/include/net/bluetooth/sco.h merged-2.6.36/include/net/bluetooth/sco.h
+--- g2-2.6.36/include/net/bluetooth/sco.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/net/bluetooth/sco.h	2011-08-09 08:49:41.000000000 -0700
+@@ -37,6 +37,7 @@
+ struct sockaddr_sco {
+ 	sa_family_t	sco_family;
+ 	bdaddr_t	sco_bdaddr;
++	__u16		sco_pkt_type;
+ };
+ 
+ /* SCO socket options */
+@@ -72,7 +73,8 @@
+ 
+ struct sco_pinfo {
+ 	struct bt_sock	bt;
+-	__u32		flags;
++	__u16		pkt_type;
++
+ 	struct sco_conn	*conn;
+ };
+ 
+diff -Naur g2-2.6.36/include/net/tcp.h merged-2.6.36/include/net/tcp.h
+--- g2-2.6.36/include/net/tcp.h	2011-08-09 08:24:38.000000000 -0700
++++ merged-2.6.36/include/net/tcp.h	2011-08-09 08:49:41.000000000 -0700
+@@ -1403,6 +1403,8 @@
+ extern int tcp_gro_complete(struct sk_buff *skb);
+ extern int tcp4_gro_complete(struct sk_buff *skb);
+ 
++extern int tcp_nuke_addr(struct net *net, struct sockaddr *addr);
++
+ #ifdef CONFIG_PROC_FS
+ extern int tcp4_proc_init(void);
+ extern void tcp4_proc_exit(void);

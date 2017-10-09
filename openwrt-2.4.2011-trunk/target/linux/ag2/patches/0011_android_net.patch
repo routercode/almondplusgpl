@@ -1,0 +1,1374 @@
+diff -Naur g2-2.6.36/net/Kconfig merged-2.6.36/net/Kconfig
+--- g2-2.6.36/net/Kconfig	2011-08-09 08:24:35.000000000 -0700
++++ merged-2.6.36/net/Kconfig	2011-08-09 08:49:41.000000000 -0700
+@@ -79,6 +79,20 @@
+ 
+ endif # if INET
+ 
++config ANDROID_PARANOID_NETWORK
++	bool "Only allow certain groups to create sockets"
++	default y
++	help
++		none
++
++config NET_ACTIVITY_STATS
++	bool "Network activity statistics tracking"
++	default y
++	help
++	 Network activity statistics are useful for tracking wireless
++	 modem activity on 2G, 3G, 4G wireless networks. Counts number of
++	 transmissions and groups them in specified time buckets.
++
+ config NETWORK_SECMARK
+ 	bool "Security Marking"
+ 	help
+@@ -216,7 +230,7 @@
+ source "net/dns_resolver/Kconfig"
+ 
+ config RPS
+-	boolean
++	boolean "RPS"
+ 	depends on SMP && SYSFS && USE_GENERIC_SMP_HELPERS
+ 	default y
+ 
+diff -Naur g2-2.6.36/net/Makefile merged-2.6.36/net/Makefile
+--- g2-2.6.36/net/Makefile	2011-08-09 08:24:35.000000000 -0700
++++ merged-2.6.36/net/Makefile	2011-08-09 08:49:41.000000000 -0700
+@@ -68,3 +68,4 @@
+ endif
+ obj-$(CONFIG_WIMAX)		+= wimax/
+ obj-$(CONFIG_DNS_RESOLVER)	+= dns_resolver/
++obj-$(CONFIG_NET_ACTIVITY_STATS)		+= activity_stats.o
+diff -Naur g2-2.6.36/net/activity_stats.c merged-2.6.36/net/activity_stats.c
+--- g2-2.6.36/net/activity_stats.c	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/net/activity_stats.c	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,115 @@
++/* net/activity_stats.c
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Author: Mike Chan (mike@android.com)
++ */
++
++#include <linux/proc_fs.h>
++#include <linux/suspend.h>
++#include <net/net_namespace.h>
++
++/*
++ * Track transmission rates in buckets (power of 2).
++ * 1,2,4,8...512 seconds.
++ *
++ * Buckets represent the count of network transmissions at least
++ * N seconds apart, where N is 1 << bucket index.
++ */
++#define BUCKET_MAX 10
++
++/* Track network activity frequency */
++static unsigned long activity_stats[BUCKET_MAX];
++static ktime_t last_transmit;
++static ktime_t suspend_time;
++static DEFINE_SPINLOCK(activity_lock);
++
++void activity_stats_update(void)
++{
++	int i;
++	unsigned long flags;
++	ktime_t now;
++	s64 delta;
++
++	spin_lock_irqsave(&activity_lock, flags);
++	now = ktime_get();
++	delta = ktime_to_ns(ktime_sub(now, last_transmit));
++
++	for (i = BUCKET_MAX - 1; i >= 0; i--) {
++		/*
++		 * Check if the time delta between network activity is within the
++		 * minimum bucket range.
++		 */
++		if (delta < (1000000000ULL << i))
++			continue;
++
++		activity_stats[i]++;
++		last_transmit = now;
++		break;
++	}
++	spin_unlock_irqrestore(&activity_lock, flags);
++}
++
++static int activity_stats_read_proc(char *page, char **start, off_t off,
++					int count, int *eof, void *data)
++{
++	int i;
++	int len;
++	char *p = page;
++
++	/* Only print if offset is 0, or we have enough buffer space */
++	if (off || count < (30 * BUCKET_MAX + 22))
++		return -ENOMEM;
++
++	len = snprintf(p, count, "Min Bucket(sec) Count\n");
++	count -= len;
++	p += len;
++
++	for (i = 0; i < BUCKET_MAX; i++) {
++		len = snprintf(p, count, "%15d %lu\n", 1 << i, activity_stats[i]);
++		count -= len;
++		p += len;
++	}
++	*eof = 1;
++
++	return p - page;
++}
++
++static int activity_stats_notifier(struct notifier_block *nb,
++					unsigned long event, void *dummy)
++{
++	switch (event) {
++		case PM_SUSPEND_PREPARE:
++			suspend_time = ktime_get_real();
++			break;
++
++		case PM_POST_SUSPEND:
++			suspend_time = ktime_sub(ktime_get_real(), suspend_time);
++			last_transmit = ktime_sub(last_transmit, suspend_time);
++	}
++
++	return 0;
++}
++
++static struct notifier_block activity_stats_notifier_block = {
++	.notifier_call = activity_stats_notifier,
++};
++
++static int  __init activity_stats_init(void)
++{
++	create_proc_read_entry("activity", S_IRUGO,
++			init_net.proc_net_stat, activity_stats_read_proc, NULL);
++	return register_pm_notifier(&activity_stats_notifier_block);
++}
++
++subsys_initcall(activity_stats_init);
++
+diff -Naur g2-2.6.36/net/bluetooth/af_bluetooth.c merged-2.6.36/net/bluetooth/af_bluetooth.c
+--- g2-2.6.36/net/bluetooth/af_bluetooth.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/bluetooth/af_bluetooth.c	2011-08-09 08:49:41.000000000 -0700
+@@ -40,6 +40,15 @@
+ 
+ #include <net/bluetooth/bluetooth.h>
+ 
++#ifdef CONFIG_ANDROID_PARANOID_NETWORK
++#include <linux/android_aid.h>
++#endif
++
++#ifndef CONFIG_BT_SOCK_DEBUG
++#undef  BT_DBG
++#define BT_DBG(D...)
++#endif
++
+ #define VERSION "2.15"
+ 
+ /* Bluetooth sockets */
+@@ -125,11 +134,40 @@
+ }
+ EXPORT_SYMBOL(bt_sock_unregister);
+ 
++#ifdef CONFIG_ANDROID_PARANOID_NETWORK
++static inline int current_has_bt_admin(void)
++{
++	return (!current_euid() || in_egroup_p(AID_NET_BT_ADMIN));
++}
++
++static inline int current_has_bt(void)
++{
++	return (current_has_bt_admin() || in_egroup_p(AID_NET_BT));
++}
++# else
++static inline int current_has_bt_admin(void)
++{
++	return 1;
++}
++
++static inline int current_has_bt(void)
++{
++	return 1;
++}
++#endif
++
+ static int bt_sock_create(struct net *net, struct socket *sock, int proto,
+ 			  int kern)
+ {
+ 	int err;
+ 
++	if (proto == BTPROTO_RFCOMM || proto == BTPROTO_SCO ||
++			proto == BTPROTO_L2CAP) {
++		if (!current_has_bt())
++			return -EPERM;
++	} else if (!current_has_bt_admin())
++		return -EPERM;
++
+ 	if (net != &init_net)
+ 		return -EAFNOSUPPORT;
+ 
+diff -Naur g2-2.6.36/net/bluetooth/hci_conn.c merged-2.6.36/net/bluetooth/hci_conn.c
+--- g2-2.6.36/net/bluetooth/hci_conn.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/bluetooth/hci_conn.c	2011-08-09 08:49:41.000000000 -0700
+@@ -217,7 +217,8 @@
+ 	hci_conn_enter_sniff_mode(conn);
+ }
+ 
+-struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst)
++struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
++					__u16 pkt_type, bdaddr_t *dst)
+ {
+ 	struct hci_conn *conn;
+ 
+@@ -242,14 +243,22 @@
+ 		conn->pkt_type = hdev->pkt_type & ACL_PTYPE_MASK;
+ 		break;
+ 	case SCO_LINK:
+-		if (lmp_esco_capable(hdev))
+-			conn->pkt_type = (hdev->esco_type & SCO_ESCO_MASK) |
+-					(hdev->esco_type & EDR_ESCO_MASK);
+-		else
+-			conn->pkt_type = hdev->pkt_type & SCO_PTYPE_MASK;
+-		break;
++		if (!pkt_type)
++			pkt_type = SCO_ESCO_MASK;
+ 	case ESCO_LINK:
+-		conn->pkt_type = hdev->esco_type & ~EDR_ESCO_MASK;
++		if (!pkt_type)
++			pkt_type = ALL_ESCO_MASK;
++		if (lmp_esco_capable(hdev)) {
++			/* HCI Setup Synchronous Connection Command uses
++			   reverse logic on the EDR_ESCO_MASK bits */
++			conn->pkt_type = (pkt_type ^ EDR_ESCO_MASK) &
++					hdev->esco_type;
++		} else {
++			/* Legacy HCI Add Sco Connection Command uses a
++			   shifted bitmask */
++			conn->pkt_type = (pkt_type << 5) & hdev->pkt_type &
++					SCO_PTYPE_MASK;
++		}
+ 		break;
+ 	}
+ 
+@@ -361,7 +370,9 @@
+ 
+ /* Create SCO or ACL connection.
+  * Device _must_ be locked */
+-struct hci_conn *hci_connect(struct hci_dev *hdev, int type, bdaddr_t *dst, __u8 sec_level, __u8 auth_type)
++struct hci_conn *hci_connect(struct hci_dev *hdev, int type,
++					__u16 pkt_type, bdaddr_t *dst,
++					__u8 sec_level, __u8 auth_type)
+ {
+ 	struct hci_conn *acl;
+ 	struct hci_conn *sco;
+@@ -369,7 +380,7 @@
+ 	BT_DBG("%s dst %s", hdev->name, batostr(dst));
+ 
+ 	if (!(acl = hci_conn_hash_lookup_ba(hdev, ACL_LINK, dst))) {
+-		if (!(acl = hci_conn_add(hdev, ACL_LINK, dst)))
++		if (!(acl = hci_conn_add(hdev, ACL_LINK, 0, dst)))
+ 			return NULL;
+ 	}
+ 
+@@ -390,7 +401,7 @@
+ 		return acl;
+ 
+ 	if (!(sco = hci_conn_hash_lookup_ba(hdev, type, dst))) {
+-		if (!(sco = hci_conn_add(hdev, type, dst))) {
++		if (!(sco = hci_conn_add(hdev, type, pkt_type, dst))) {
+ 			hci_conn_put(acl);
+ 			return NULL;
+ 		}
+@@ -404,7 +415,7 @@
+ 	if (acl->state == BT_CONNECTED &&
+ 			(sco->state == BT_OPEN || sco->state == BT_CLOSED)) {
+ 		acl->power_save = 1;
+-		hci_conn_enter_active_mode(acl);
++		hci_conn_enter_active_mode(acl, 1);
+ 
+ 		if (test_bit(HCI_CONN_MODE_CHANGE_PEND, &acl->pend)) {
+ 			/* defer SCO setup until mode change completed */
+@@ -520,7 +531,7 @@
+ EXPORT_SYMBOL(hci_conn_switch_role);
+ 
+ /* Enter active mode */
+-void hci_conn_enter_active_mode(struct hci_conn *conn)
++void hci_conn_enter_active_mode(struct hci_conn *conn, __u8 force_active)
+ {
+ 	struct hci_dev *hdev = conn->hdev;
+ 
+@@ -529,7 +540,10 @@
+ 	if (test_bit(HCI_RAW, &hdev->flags))
+ 		return;
+ 
+-	if (conn->mode != HCI_CM_SNIFF || !conn->power_save)
++	if (conn->mode != HCI_CM_SNIFF)
++		goto timer;
++
++	if (!conn->power_save && !force_active)
+ 		goto timer;
+ 
+ 	if (!test_and_set_bit(HCI_CONN_MODE_CHANGE_PEND, &conn->pend)) {
+@@ -668,6 +682,15 @@
+ 		(ci + n)->out   = c->out;
+ 		(ci + n)->state = c->state;
+ 		(ci + n)->link_mode = c->link_mode;
++		if (c->type == SCO_LINK) {
++			(ci + n)->mtu = hdev->sco_mtu;
++			(ci + n)->cnt = hdev->sco_cnt;
++			(ci + n)->pkts = hdev->sco_pkts;
++		} else {
++			(ci + n)->mtu = hdev->acl_mtu;
++			(ci + n)->cnt = hdev->acl_cnt;
++			(ci + n)->pkts = hdev->acl_pkts;
++		}
+ 		if (++n >= req.conn_num)
+ 			break;
+ 	}
+@@ -704,6 +727,15 @@
+ 		ci.out   = conn->out;
+ 		ci.state = conn->state;
+ 		ci.link_mode = conn->link_mode;
++		if (req.type == SCO_LINK) {
++			ci.mtu = hdev->sco_mtu;
++			ci.cnt = hdev->sco_cnt;
++			ci.pkts = hdev->sco_pkts;
++		} else {
++			ci.mtu = hdev->acl_mtu;
++			ci.cnt = hdev->acl_cnt;
++			ci.pkts = hdev->acl_pkts;
++		}
+ 	}
+ 	hci_dev_unlock_bh(hdev);
+ 
+diff -Naur g2-2.6.36/net/bluetooth/hci_core.c merged-2.6.36/net/bluetooth/hci_core.c
+--- g2-2.6.36/net/bluetooth/hci_core.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/bluetooth/hci_core.c	2011-08-09 08:49:41.000000000 -0700
+@@ -1367,7 +1367,7 @@
+ 
+ 	skb->dev = (void *) hdev;
+ 	bt_cb(skb)->pkt_type = HCI_ACLDATA_PKT;
+-	hci_add_acl_hdr(skb, conn->handle, flags | ACL_START);
++	hci_add_acl_hdr(skb, conn->handle, flags);
+ 
+ 	if (!(list = skb_shinfo(skb)->frag_list)) {
+ 		/* Non fragmented */
+@@ -1384,12 +1384,14 @@
+ 		spin_lock_bh(&conn->data_q.lock);
+ 
+ 		__skb_queue_tail(&conn->data_q, skb);
++		flags &= ~ACL_PB_MASK;
++		flags |= ACL_CONT;
+ 		do {
+ 			skb = list; list = list->next;
+ 
+ 			skb->dev = (void *) hdev;
+ 			bt_cb(skb)->pkt_type = HCI_ACLDATA_PKT;
+-			hci_add_acl_hdr(skb, conn->handle, flags | ACL_CONT);
++			hci_add_acl_hdr(skb, conn->handle, flags);
+ 
+ 			BT_DBG("%s frag %p len %d", hdev->name, skb, skb->len);
+ 
+@@ -1505,7 +1507,7 @@
+ 		while (quote-- && (skb = skb_dequeue(&conn->data_q))) {
+ 			BT_DBG("skb %p len %d", skb, skb->len);
+ 
+-			hci_conn_enter_active_mode(conn);
++			hci_conn_enter_active_mode(conn, bt_cb(skb)->force_active);
+ 
+ 			hci_send_frame(skb);
+ 			hdev->acl_last_tx = jiffies;
+@@ -1607,7 +1609,7 @@
+ 	if (conn) {
+ 		register struct hci_proto *hp;
+ 
+-		hci_conn_enter_active_mode(conn);
++		hci_conn_enter_active_mode(conn, bt_cb(skb)->force_active);
+ 
+ 		/* Send to upper protocol */
+ 		if ((hp = hci_proto[HCI_PROTO_L2CAP]) && hp->recv_acldata) {
+diff -Naur g2-2.6.36/net/bluetooth/hci_event.c merged-2.6.36/net/bluetooth/hci_event.c
+--- g2-2.6.36/net/bluetooth/hci_event.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/bluetooth/hci_event.c	2011-08-09 08:49:41.000000000 -0700
+@@ -579,7 +579,7 @@
+ 		}
+ 	} else {
+ 		if (!conn) {
+-			conn = hci_conn_add(hdev, ACL_LINK, &cp->bdaddr);
++			conn = hci_conn_add(hdev, ACL_LINK, 0, &cp->bdaddr);
+ 			if (conn) {
+ 				conn->out = 1;
+ 				conn->link_mode |= HCI_LM_MASTER;
+@@ -960,7 +960,9 @@
+ 
+ 		conn = hci_conn_hash_lookup_ba(hdev, ev->link_type, &ev->bdaddr);
+ 		if (!conn) {
+-			if (!(conn = hci_conn_add(hdev, ev->link_type, &ev->bdaddr))) {
++			/* pkt_type not yet used for incoming connections */
++			if (!(conn = hci_conn_add(hdev, ev->link_type, 0,
++							&ev->bdaddr))) {
+ 				BT_ERR("No memory for new connection");
+ 				hci_dev_unlock(hdev);
+ 				return;
+@@ -1699,6 +1701,7 @@
+ 		hci_conn_add_sysfs(conn);
+ 		break;
+ 
++	case 0x10:	/* Connection Accept Timeout */
+ 	case 0x11:	/* Unsupported Feature or Parameter Value */
+ 	case 0x1c:	/* SCO interval rejected */
+ 	case 0x1a:	/* Unsupported Remote Feature */
+diff -Naur g2-2.6.36/net/bluetooth/l2cap.c merged-2.6.36/net/bluetooth/l2cap.c
+--- g2-2.6.36/net/bluetooth/l2cap.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/bluetooth/l2cap.c	2011-08-09 08:49:41.000000000 -0700
+@@ -354,13 +354,21 @@
+ static inline void l2cap_send_cmd(struct l2cap_conn *conn, u8 ident, u8 code, u16 len, void *data)
+ {
+ 	struct sk_buff *skb = l2cap_build_cmd(conn, code, ident, len, data);
++	u8 flags;
+ 
+ 	BT_DBG("code 0x%2.2x", code);
+ 
+ 	if (!skb)
+ 		return;
+ 
+-	hci_send_acl(conn->hcon, skb, 0);
++	if (lmp_no_flush_capable(conn->hcon->hdev))
++		flags = ACL_START_NO_FLUSH;
++	else
++		flags = ACL_START;
++
++	bt_cb(skb)->force_active = 1;
++
++	hci_send_acl(conn->hcon, skb, flags);
+ }
+ 
+ static inline void l2cap_send_sframe(struct l2cap_pinfo *pi, u16 control)
+@@ -406,6 +414,8 @@
+ 		put_unaligned_le16(fcs, skb_put(skb, 2));
+ 	}
+ 
++	bt_cb(skb)->force_active = l2cap_pi(sk)->force_active;
++
+ 	hci_send_acl(pi->conn->hcon, skb, 0);
+ }
+ 
+@@ -564,7 +574,8 @@
+ 					struct sock *parent = bt_sk(sk)->parent;
+ 					rsp.result = cpu_to_le16(L2CAP_CR_PEND);
+ 					rsp.status = cpu_to_le16(L2CAP_CS_AUTHOR_PEND);
+-					parent->sk_data_ready(parent, 0);
++					if (parent)
++						parent->sk_data_ready(parent, 0);
+ 
+ 				} else {
+ 					sk->sk_state = BT_CONFIG;
+@@ -900,6 +911,8 @@
+ 		pi->sec_level = l2cap_pi(parent)->sec_level;
+ 		pi->role_switch = l2cap_pi(parent)->role_switch;
+ 		pi->force_reliable = l2cap_pi(parent)->force_reliable;
++		pi->flushable = l2cap_pi(parent)->flushable;
++		pi->force_active = l2cap_pi(parent)->force_active;
+ 	} else {
+ 		pi->imtu = L2CAP_DEFAULT_MTU;
+ 		pi->omtu = 0;
+@@ -915,6 +928,8 @@
+ 		pi->sec_level = BT_SECURITY_LOW;
+ 		pi->role_switch = 0;
+ 		pi->force_reliable = 0;
++		pi->flushable = 0;
++		pi->force_active = 1;
+ 	}
+ 
+ 	/* Default config options */
+@@ -1092,7 +1107,7 @@
+ 		}
+ 	}
+ 
+-	hcon = hci_connect(hdev, ACL_LINK, dst,
++	hcon = hci_connect(hdev, ACL_LINK, 0, dst,
+ 					l2cap_pi(sk)->sec_level, auth_type);
+ 	if (!hcon)
+ 		goto done;
+@@ -1433,10 +1448,18 @@
+ static inline void l2cap_do_send(struct sock *sk, struct sk_buff *skb)
+ {
+ 	struct l2cap_pinfo *pi = l2cap_pi(sk);
++	struct hci_conn *hcon = pi->conn->hcon;
++	u16 flags;
+ 
+ 	BT_DBG("sk %p, skb %p len %d", sk, skb, skb->len);
+ 
+-	hci_send_acl(pi->conn->hcon, skb, 0);
++	if (lmp_no_flush_capable(hcon->hdev) && !l2cap_pi(sk)->flushable)
++		flags = ACL_START_NO_FLUSH;
++	else
++		flags = ACL_START;
++
++	bt_cb(skb)->force_active = pi->force_active;
++	hci_send_acl(hcon, skb, flags);
+ }
+ 
+ static void l2cap_streaming_send(struct sock *sk)
+@@ -2011,6 +2034,7 @@
+ 
+ 		l2cap_pi(sk)->role_switch    = (opt & L2CAP_LM_MASTER);
+ 		l2cap_pi(sk)->force_reliable = (opt & L2CAP_LM_RELIABLE);
++		l2cap_pi(sk)->flushable = (opt & L2CAP_LM_FLUSHABLE);
+ 		break;
+ 
+ 	default:
+@@ -2026,6 +2050,7 @@
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct bt_security sec;
++	struct bt_power pwr;
+ 	int len, err = 0;
+ 	u32 opt;
+ 
+@@ -2078,6 +2103,23 @@
+ 		bt_sk(sk)->defer_setup = opt;
+ 		break;
+ 
++	case BT_POWER:
++		if (sk->sk_type != SOCK_SEQPACKET && sk->sk_type != SOCK_STREAM
++				&& sk->sk_type != SOCK_RAW) {
++			err = -EINVAL;
++			break;
++		}
++
++		pwr.force_active = 1;
++
++		len = min_t(unsigned int, sizeof(pwr), optlen);
++		if (copy_from_user((char *) &pwr, optval, len)) {
++			err = -EFAULT;
++			break;
++		}
++		l2cap_pi(sk)->force_active = pwr.force_active;
++		break;
++
+ 	default:
+ 		err = -ENOPROTOOPT;
+ 		break;
+@@ -2141,6 +2183,9 @@
+ 		if (l2cap_pi(sk)->force_reliable)
+ 			opt |= L2CAP_LM_RELIABLE;
+ 
++		if (l2cap_pi(sk)->flushable)
++			opt |= L2CAP_LM_FLUSHABLE;
++
+ 		if (put_user(opt, (u32 __user *) optval))
+ 			err = -EFAULT;
+ 		break;
+@@ -2175,6 +2220,7 @@
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct bt_security sec;
++	struct bt_power pwr;
+ 	int len, err = 0;
+ 
+ 	BT_DBG("sk %p", sk);
+@@ -2217,6 +2263,20 @@
+ 
+ 		break;
+ 
++	case BT_POWER:
++		if (sk->sk_type != SOCK_SEQPACKET && sk->sk_type != SOCK_STREAM
++				&& sk->sk_type != SOCK_RAW) {
++			err = -EINVAL;
++			break;
++		}
++
++		pwr.force_active = l2cap_pi(sk)->force_active;
++
++		len = min_t(unsigned int, len, sizeof(pwr));
++		if (copy_to_user(optval, (char *) &pwr, len))
++			err = -EFAULT;
++
++		break;
+ 	default:
+ 		err = -ENOPROTOOPT;
+ 		break;
+@@ -4641,7 +4701,7 @@
+ 
+ 	BT_DBG("conn %p len %d flags 0x%x", conn, skb->len, flags);
+ 
+-	if (flags & ACL_START) {
++	if (!(flags & ACL_CONT)) {
+ 		struct l2cap_hdr *hdr;
+ 		int len;
+ 
+diff -Naur g2-2.6.36/net/bluetooth/rfcomm/core.c merged-2.6.36/net/bluetooth/rfcomm/core.c
+--- g2-2.6.36/net/bluetooth/rfcomm/core.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/bluetooth/rfcomm/core.c	2011-08-09 08:49:41.000000000 -0700
+@@ -248,32 +248,6 @@
+ 								auth_type);
+ }
+ 
+-static void rfcomm_session_timeout(unsigned long arg)
+-{
+-	struct rfcomm_session *s = (void *) arg;
+-
+-	BT_DBG("session %p state %ld", s, s->state);
+-
+-	set_bit(RFCOMM_TIMED_OUT, &s->flags);
+-	rfcomm_schedule(RFCOMM_SCHED_TIMEO);
+-}
+-
+-static void rfcomm_session_set_timer(struct rfcomm_session *s, long timeout)
+-{
+-	BT_DBG("session %p state %ld timeout %ld", s, s->state, timeout);
+-
+-	if (!mod_timer(&s->timer, jiffies + timeout))
+-		rfcomm_session_hold(s);
+-}
+-
+-static void rfcomm_session_clear_timer(struct rfcomm_session *s)
+-{
+-	BT_DBG("session %p state %ld", s, s->state);
+-
+-	if (timer_pending(&s->timer) && del_timer(&s->timer))
+-		rfcomm_session_put(s);
+-}
+-
+ /* ---- RFCOMM DLCs ---- */
+ static void rfcomm_dlc_timeout(unsigned long arg)
+ {
+@@ -350,7 +324,6 @@
+ 
+ 	rfcomm_session_hold(s);
+ 
+-	rfcomm_session_clear_timer(s);
+ 	rfcomm_dlc_hold(d);
+ 	list_add(&d->list, &s->dlcs);
+ 	d->session = s;
+@@ -366,9 +339,6 @@
+ 	d->session = NULL;
+ 	rfcomm_dlc_put(d);
+ 
+-	if (list_empty(&s->dlcs))
+-		rfcomm_session_set_timer(s, RFCOMM_IDLE_TIMEOUT);
+-
+ 	rfcomm_session_put(s);
+ }
+ 
+@@ -462,7 +432,6 @@
+ 
+ 	switch (d->state) {
+ 	case BT_CONNECT:
+-	case BT_CONFIG:
+ 		if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
+ 			set_bit(RFCOMM_AUTH_REJECT, &d->flags);
+ 			rfcomm_schedule(RFCOMM_SCHED_AUTH);
+@@ -482,7 +451,6 @@
+ 		break;
+ 
+ 	case BT_OPEN:
+-	case BT_CONNECT2:
+ 		if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
+ 			set_bit(RFCOMM_AUTH_REJECT, &d->flags);
+ 			rfcomm_schedule(RFCOMM_SCHED_AUTH);
+@@ -601,8 +569,6 @@
+ 
+ 	BT_DBG("session %p sock %p", s, sock);
+ 
+-	setup_timer(&s->timer, rfcomm_session_timeout, (unsigned long) s);
+-
+ 	INIT_LIST_HEAD(&s->dlcs);
+ 	s->state = state;
+ 	s->sock  = sock;
+@@ -634,7 +600,6 @@
+ 	if (state == BT_CONNECTED)
+ 		rfcomm_send_disc(s, 0);
+ 
+-	rfcomm_session_clear_timer(s);
+ 	sock_release(s->sock);
+ 	kfree(s);
+ 
+@@ -676,7 +641,6 @@
+ 		__rfcomm_dlc_close(d, err);
+ 	}
+ 
+-	rfcomm_session_clear_timer(s);
+ 	rfcomm_session_put(s);
+ }
+ 
+@@ -1238,8 +1202,6 @@
+ 
+ 	rfcomm_send_ua(d->session, d->dlci);
+ 
+-	rfcomm_dlc_clear_timer(d);
+-
+ 	rfcomm_dlc_lock(d);
+ 	d->state = BT_CONNECTED;
+ 	d->state_change(d, 0);
+@@ -1257,11 +1219,6 @@
+ 		if (d->defer_setup) {
+ 			set_bit(RFCOMM_DEFER_SETUP, &d->flags);
+ 			rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
+-
+-			rfcomm_dlc_lock(d);
+-			d->state = BT_CONNECT2;
+-			d->state_change(d, 0);
+-			rfcomm_dlc_unlock(d);
+ 		} else
+ 			rfcomm_dlc_accept(d);
+ 	} else {
+@@ -1803,11 +1760,6 @@
+ 				if (d->defer_setup) {
+ 					set_bit(RFCOMM_DEFER_SETUP, &d->flags);
+ 					rfcomm_dlc_set_timer(d, RFCOMM_AUTH_TIMEOUT);
+-
+-					rfcomm_dlc_lock(d);
+-					d->state = BT_CONNECT2;
+-					d->state_change(d, 0);
+-					rfcomm_dlc_unlock(d);
+ 				} else
+ 					rfcomm_dlc_accept(d);
+ 			}
+@@ -1923,13 +1875,6 @@
+ 		struct rfcomm_session *s;
+ 		s = list_entry(p, struct rfcomm_session, list);
+ 
+-		if (test_and_clear_bit(RFCOMM_TIMED_OUT, &s->flags)) {
+-			s->state = BT_DISCONN;
+-			rfcomm_send_disc(s, 0);
+-			rfcomm_session_put(s);
+-			continue;
+-		}
+-
+ 		if (s->state == BT_LISTEN) {
+ 			rfcomm_accept_connection(s);
+ 			continue;
+diff -Naur g2-2.6.36/net/bluetooth/sco.c merged-2.6.36/net/bluetooth/sco.c
+--- g2-2.6.36/net/bluetooth/sco.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/bluetooth/sco.c	2011-08-09 08:49:41.000000000 -0700
+@@ -178,6 +178,7 @@
+ {
+ 	bdaddr_t *src = &bt_sk(sk)->src;
+ 	bdaddr_t *dst = &bt_sk(sk)->dst;
++	__u16 pkt_type = sco_pi(sk)->pkt_type;
+ 	struct sco_conn *conn;
+ 	struct hci_conn *hcon;
+ 	struct hci_dev  *hdev;
+@@ -194,10 +195,13 @@
+ 
+ 	if (lmp_esco_capable(hdev) && !disable_esco)
+ 		type = ESCO_LINK;
+-	else
++	else {
+ 		type = SCO_LINK;
++		pkt_type &= SCO_ESCO_MASK;
++	}
+ 
+-	hcon = hci_connect(hdev, type, dst, BT_SECURITY_LOW, HCI_AT_NO_BONDING);
++	hcon = hci_connect(hdev, type, pkt_type, dst,
++					BT_SECURITY_LOW, HCI_AT_NO_BONDING);
+ 	if (!hcon)
+ 		goto done;
+ 
+@@ -450,18 +454,22 @@
+ 	return 0;
+ }
+ 
+-static int sco_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
++static int sco_sock_bind(struct socket *sock, struct sockaddr *addr, int alen)
+ {
+-	struct sockaddr_sco *sa = (struct sockaddr_sco *) addr;
++	struct sockaddr_sco sa;
+ 	struct sock *sk = sock->sk;
+-	bdaddr_t *src = &sa->sco_bdaddr;
+-	int err = 0;
++	bdaddr_t *src = &sa.sco_bdaddr;
++	int len, err = 0;
+ 
+-	BT_DBG("sk %p %s", sk, batostr(&sa->sco_bdaddr));
++	BT_DBG("sk %p %s", sk, batostr(&sa.sco_bdaddr));
+ 
+ 	if (!addr || addr->sa_family != AF_BLUETOOTH)
+ 		return -EINVAL;
+ 
++	memset(&sa, 0, sizeof(sa));
++	len = min_t(unsigned int, sizeof(sa), alen);
++	memcpy(&sa, addr, len);
++
+ 	lock_sock(sk);
+ 
+ 	if (sk->sk_state != BT_OPEN) {
+@@ -475,7 +483,8 @@
+ 		err = -EADDRINUSE;
+ 	} else {
+ 		/* Save source address */
+-		bacpy(&bt_sk(sk)->src, &sa->sco_bdaddr);
++		bacpy(&bt_sk(sk)->src, &sa.sco_bdaddr);
++		sco_pi(sk)->pkt_type = sa.sco_pkt_type;
+ 		sk->sk_state = BT_BOUND;
+ 	}
+ 
+@@ -488,27 +497,34 @@
+ 
+ static int sco_sock_connect(struct socket *sock, struct sockaddr *addr, int alen, int flags)
+ {
+-	struct sockaddr_sco *sa = (struct sockaddr_sco *) addr;
+ 	struct sock *sk = sock->sk;
+-	int err = 0;
+-
++	struct sockaddr_sco sa;
++	int len, err = 0;
+ 
+ 	BT_DBG("sk %p", sk);
+ 
+-	if (alen < sizeof(struct sockaddr_sco) ||
+-	    addr->sa_family != AF_BLUETOOTH)
++	if (!addr || addr->sa_family != AF_BLUETOOTH)
+ 		return -EINVAL;
+ 
+-	if (sk->sk_state != BT_OPEN && sk->sk_state != BT_BOUND)
+-		return -EBADFD;
+-
+-	if (sk->sk_type != SOCK_SEQPACKET)
+-		return -EINVAL;
++	memset(&sa, 0, sizeof(sa));
++	len = min_t(unsigned int, sizeof(sa), alen);
++	memcpy(&sa, addr, len);
+ 
+ 	lock_sock(sk);
+ 
++	if (sk->sk_type != SOCK_SEQPACKET) {
++		err = -EINVAL;
++		goto done;
++	}
++
++	if (sk->sk_state != BT_OPEN && sk->sk_state != BT_BOUND) {
++		err = -EBADFD;
++		goto done;
++	}
++
+ 	/* Set destination address and psm */
+-	bacpy(&bt_sk(sk)->dst, &sa->sco_bdaddr);
++	bacpy(&bt_sk(sk)->dst, &sa.sco_bdaddr);
++	sco_pi(sk)->pkt_type = sa.sco_pkt_type;
+ 
+ 	if ((err = sco_connect(sk)))
+ 		goto done;
+@@ -614,6 +630,7 @@
+ 		bacpy(&sa->sco_bdaddr, &bt_sk(sk)->dst);
+ 	else
+ 		bacpy(&sa->sco_bdaddr, &bt_sk(sk)->src);
++	sa->sco_pkt_type = sco_pi(sk)->pkt_type;
+ 
+ 	return 0;
+ }
+diff -Naur g2-2.6.36/net/ipv4/Makefile merged-2.6.36/net/ipv4/Makefile
+--- g2-2.6.36/net/ipv4/Makefile	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/ipv4/Makefile	2011-08-09 08:49:41.000000000 -0700
+@@ -14,6 +14,7 @@
+ 	     inet_fragment.o
+ 
+ obj-$(CONFIG_SYSCTL) += sysctl_net_ipv4.o
++obj-$(CONFIG_SYSFS) += sysfs_net_ipv4.o
+ obj-$(CONFIG_IP_FIB_HASH) += fib_hash.o
+ obj-$(CONFIG_IP_FIB_TRIE) += fib_trie.o
+ obj-$(CONFIG_PROC_FS) += proc.o
+diff -Naur g2-2.6.36/net/ipv4/af_inet.c merged-2.6.36/net/ipv4/af_inet.c
+--- g2-2.6.36/net/ipv4/af_inet.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/ipv4/af_inet.c	2011-08-09 08:49:41.000000000 -0700
+@@ -117,6 +117,19 @@
+ #include <linux/mroute.h>
+ #endif
+ 
++#ifdef CONFIG_ANDROID_PARANOID_NETWORK
++#include <linux/android_aid.h>
++
++static inline int current_has_network(void)
++{
++	return in_egroup_p(AID_INET) || capable(CAP_NET_RAW);
++}
++#else
++static inline int current_has_network(void)
++{
++	return 1;
++}
++#endif
+ 
+ /* The inetsw table contains everything that inet_create needs to
+  * build a new socket.
+@@ -259,6 +272,7 @@
+ 	return ipprot->netns_ok;
+ }
+ 
++
+ /*
+  *	Create an inet socket.
+  */
+@@ -275,6 +289,9 @@
+ 	int try_loading_module = 0;
+ 	int err;
+ 
++	if (!current_has_network())
++		return -EACCES;
++
+ 	if (unlikely(!inet_ehash_secret))
+ 		if (sock->type != SOCK_RAW && sock->type != SOCK_DGRAM)
+ 			build_ehash_secret();
+@@ -869,6 +886,7 @@
+ 	case SIOCSIFPFLAGS:
+ 	case SIOCGIFPFLAGS:
+ 	case SIOCSIFFLAGS:
++	case SIOCKILLADDR:
+ 		err = devinet_ioctl(net, cmd, (void __user *)arg);
+ 		break;
+ 	default:
+diff -Naur g2-2.6.36/net/ipv4/devinet.c merged-2.6.36/net/ipv4/devinet.c
+--- g2-2.6.36/net/ipv4/devinet.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/ipv4/devinet.c	2011-08-09 08:49:41.000000000 -0700
+@@ -58,6 +58,7 @@
+ 
+ #include <net/arp.h>
+ #include <net/ip.h>
++#include <net/tcp.h>
+ #include <net/route.h>
+ #include <net/ip_fib.h>
+ #include <net/rtnetlink.h>
+@@ -635,6 +636,7 @@
+ 	case SIOCSIFBRDADDR:	/* Set the broadcast address */
+ 	case SIOCSIFDSTADDR:	/* Set the destination address */
+ 	case SIOCSIFNETMASK: 	/* Set the netmask for the interface */
++	case SIOCKILLADDR:	/* Nuke all sockets on this address */
+ 		ret = -EACCES;
+ 		if (!capable(CAP_NET_ADMIN))
+ 			goto out;
+@@ -686,7 +688,8 @@
+ 	}
+ 
+ 	ret = -EADDRNOTAVAIL;
+-	if (!ifa && cmd != SIOCSIFADDR && cmd != SIOCSIFFLAGS)
++	if (!ifa && cmd != SIOCSIFADDR && cmd != SIOCSIFFLAGS
++	    && cmd != SIOCKILLADDR)
+ 		goto done;
+ 
+ 	switch (cmd) {
+@@ -811,6 +814,9 @@
+ 			inet_insert_ifa(ifa);
+ 		}
+ 		break;
++	case SIOCKILLADDR:	/* Nuke all connections on this address */
++		ret = tcp_nuke_addr(net, (struct sockaddr *) sin);
++		break;
+ 	}
+ done:
+ 	rtnl_unlock();
+diff -Naur g2-2.6.36/net/ipv4/sysfs_net_ipv4.c merged-2.6.36/net/ipv4/sysfs_net_ipv4.c
+--- g2-2.6.36/net/ipv4/sysfs_net_ipv4.c	1969-12-31 16:00:00.000000000 -0800
++++ merged-2.6.36/net/ipv4/sysfs_net_ipv4.c	2011-08-09 08:49:41.000000000 -0700
+@@ -0,0 +1,88 @@
++/*
++ * net/ipv4/sysfs_net_ipv4.c
++ *
++ * sysfs-based networking knobs (so we can, unlike with sysctl, control perms)
++ *
++ * Copyright (C) 2008 Google, Inc.
++ *
++ * Robert Love <rlove@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kobject.h>
++#include <linux/string.h>
++#include <linux/sysfs.h>
++#include <linux/init.h>
++#include <net/tcp.h>
++
++#define CREATE_IPV4_FILE(_name, _var) \
++static ssize_t _name##_show(struct kobject *kobj, \
++			    struct kobj_attribute *attr, char *buf) \
++{ \
++	return sprintf(buf, "%d\n", _var); \
++} \
++static ssize_t _name##_store(struct kobject *kobj, \
++			     struct kobj_attribute *attr, \
++			     const char *buf, size_t count) \
++{ \
++	int val, ret; \
++	ret = sscanf(buf, "%d", &val); \
++	if (ret != 1) \
++		return -EINVAL; \
++	if (val < 0) \
++		return -EINVAL; \
++	_var = val; \
++	return count; \
++} \
++static struct kobj_attribute _name##_attr = \
++	__ATTR(_name, 0644, _name##_show, _name##_store)
++
++CREATE_IPV4_FILE(tcp_wmem_min, sysctl_tcp_wmem[0]);
++CREATE_IPV4_FILE(tcp_wmem_def, sysctl_tcp_wmem[1]);
++CREATE_IPV4_FILE(tcp_wmem_max, sysctl_tcp_wmem[2]);
++
++CREATE_IPV4_FILE(tcp_rmem_min, sysctl_tcp_rmem[0]);
++CREATE_IPV4_FILE(tcp_rmem_def, sysctl_tcp_rmem[1]);
++CREATE_IPV4_FILE(tcp_rmem_max, sysctl_tcp_rmem[2]);
++
++static struct attribute *ipv4_attrs[] = {
++	&tcp_wmem_min_attr.attr,
++	&tcp_wmem_def_attr.attr,
++	&tcp_wmem_max_attr.attr,
++	&tcp_rmem_min_attr.attr,
++	&tcp_rmem_def_attr.attr,
++	&tcp_rmem_max_attr.attr,
++	NULL
++};
++
++static struct attribute_group ipv4_attr_group = {
++	.attrs = ipv4_attrs,
++};
++
++static __init int sysfs_ipv4_init(void)
++{
++	struct kobject *ipv4_kobject;
++	int ret;
++
++	ipv4_kobject = kobject_create_and_add("ipv4", kernel_kobj);
++	if (!ipv4_kobject)
++		return -ENOMEM;
++
++	ret = sysfs_create_group(ipv4_kobject, &ipv4_attr_group);
++	if (ret) {
++		kobject_put(ipv4_kobject);
++		return ret;
++	}
++
++	return 0;
++}
++
++subsys_initcall(sysfs_ipv4_init);
+diff -Naur g2-2.6.36/net/ipv4/tcp.c merged-2.6.36/net/ipv4/tcp.c
+--- g2-2.6.36/net/ipv4/tcp.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/ipv4/tcp.c	2011-08-09 08:49:41.000000000 -0700
+@@ -266,11 +266,13 @@
+ #include <linux/crypto.h>
+ #include <linux/time.h>
+ #include <linux/slab.h>
++#include <linux/uid_stat.h>
+ 
+ #include <net/icmp.h>
+ #include <net/tcp.h>
+ #include <net/xfrm.h>
+ #include <net/ip.h>
++#include <net/ip6_route.h>
+ #include <net/netdma.h>
+ #include <net/sock.h>
+ 
+@@ -1106,6 +1108,9 @@
+ 		tcp_push(sk, flags, mss_now, tp->nonagle);
+ 	TCP_CHECK_TIMER(sk);
+ 	release_sock(sk);
++
++	if (copied > 0)
++		uid_stat_tcp_snd(current_uid(), copied);
+ 	return copied;
+ 
+ do_fault:
+@@ -1383,8 +1388,11 @@
+ 	tcp_rcv_space_adjust(sk);
+ 
+ 	/* Clean up data we have read: This will do ACK frames. */
+-	if (copied > 0)
++	if (copied > 0) {
+ 		tcp_cleanup_rbuf(sk, copied);
++		uid_stat_tcp_rcv(current_uid(), copied);
++	}
++
+ 	return copied;
+ }
+ EXPORT_SYMBOL(tcp_read_sock);
+@@ -1771,6 +1779,9 @@
+ 
+ 	TCP_CHECK_TIMER(sk);
+ 	release_sock(sk);
++
++	if (copied > 0)
++		uid_stat_tcp_rcv(current_uid(), copied);
+ 	return copied;
+ 
+ out:
+@@ -1780,6 +1791,8 @@
+ 
+ recv_urg:
+ 	err = tcp_recv_urg(sk, msg, len, flags);
++	if (err > 0)
++		uid_stat_tcp_rcv(current_uid(), err);
+ 	goto out;
+ }
+ EXPORT_SYMBOL(tcp_recvmsg);
+@@ -3308,3 +3321,99 @@
+ 	tcp_secret_retiring = &tcp_secret_two;
+ 	tcp_secret_secondary = &tcp_secret_two;
+ }
++
++static int tcp_is_local(struct net *net, __be32 addr) {
++	struct rtable *rt;
++	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = addr } } };
++	if (ip_route_output_key(net, &rt, &fl) || !rt)
++		return 0;
++	return rt->dst.dev && (rt->dst.dev->flags & IFF_LOOPBACK);
++}
++
++#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
++static int tcp_is_local6(struct net *net, struct in6_addr *addr) {
++	struct rt6_info *rt6 = rt6_lookup(net, addr, addr, 0, 0);
++	return rt6 && rt6->rt6i_dev && (rt6->rt6i_dev->flags & IFF_LOOPBACK);
++}
++#endif
++
++/*
++ * tcp_nuke_addr - destroy all sockets on the given local address
++ * if local address is the unspecified address (0.0.0.0 or ::), destroy all
++ * sockets with local addresses that are not configured.
++ */
++int tcp_nuke_addr(struct net *net, struct sockaddr *addr)
++{
++	int family = addr->sa_family;
++	unsigned int bucket;
++
++	struct in_addr *in;
++#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
++	struct in6_addr *in6;
++#endif
++	if (family == AF_INET) {
++		in = &((struct sockaddr_in *)addr)->sin_addr;
++#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
++	} else if (family == AF_INET6) {
++		in6 = &((struct sockaddr_in6 *)addr)->sin6_addr;
++#endif
++	} else {
++		return -EAFNOSUPPORT;
++	}
++
++	for (bucket = 0; bucket < tcp_hashinfo.ehash_mask; bucket++) {
++		struct hlist_nulls_node *node;
++		struct sock *sk;
++		spinlock_t *lock = inet_ehash_lockp(&tcp_hashinfo, bucket);
++
++restart:
++		spin_lock_bh(lock);
++		sk_nulls_for_each(sk, node, &tcp_hashinfo.ehash[bucket].chain) {
++			struct inet_sock *inet = inet_sk(sk);
++
++			if (family == AF_INET) {
++				__be32 s4 = inet->inet_rcv_saddr;
++				if (in->s_addr != s4 &&
++				    !(in->s_addr == INADDR_ANY &&
++				      !tcp_is_local(net, s4)))
++					continue;
++			}
++
++#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
++			if (family == AF_INET6) {
++				struct in6_addr *s6;
++				if (!inet->pinet6)
++					continue;
++				s6 = &inet->pinet6->rcv_saddr;
++				if (!ipv6_addr_equal(in6, s6) &&
++				    !(ipv6_addr_equal(in6, &in6addr_any) &&
++				      !tcp_is_local6(net, s6)))
++				continue;
++			}
++#endif
++
++			if (sysctl_ip_dynaddr && sk->sk_state == TCP_SYN_SENT)
++				continue;
++			if (sock_flag(sk, SOCK_DEAD))
++				continue;
++
++			sock_hold(sk);
++			spin_unlock_bh(lock);
++
++			local_bh_disable();
++			bh_lock_sock(sk);
++			sk->sk_err = ETIMEDOUT;
++			sk->sk_error_report(sk);
++
++			tcp_done(sk);
++			bh_unlock_sock(sk);
++			local_bh_enable();
++			sock_put(sk);
++
++			goto restart;
++		}
++		spin_unlock_bh(lock);
++	}
++
++	return 0;
++}
+diff -Naur g2-2.6.36/net/ipv6/af_inet6.c merged-2.6.36/net/ipv6/af_inet6.c
+--- g2-2.6.36/net/ipv6/af_inet6.c	2011-08-09 08:24:35.000000000 -0700
++++ merged-2.6.36/net/ipv6/af_inet6.c	2011-08-09 08:49:41.000000000 -0700
+@@ -63,6 +63,20 @@
+ #include <asm/system.h>
+ #include <linux/mroute6.h>
+ 
++#ifdef CONFIG_ANDROID_PARANOID_NETWORK
++#include <linux/android_aid.h>
++
++static inline int current_has_network(void)
++{
++	return in_egroup_p(AID_INET) || capable(CAP_NET_RAW);
++}
++#else
++static inline int current_has_network(void)
++{
++	return 1;
++}
++#endif
++
+ MODULE_AUTHOR("Cast of dozens");
+ MODULE_DESCRIPTION("IPv6 protocol stack for Linux");
+ MODULE_LICENSE("GPL");
+@@ -109,6 +123,9 @@
+ 	int try_loading_module = 0;
+ 	int err;
+ 
++	if (!current_has_network())
++		return -EACCES;
++
+ 	if (sock->type != SOCK_RAW &&
+ 	    sock->type != SOCK_DGRAM &&
+ 	    !inet_ehash_secret)
+@@ -472,6 +489,21 @@
+ 
+ EXPORT_SYMBOL(inet6_getname);
+ 
++int inet6_killaddr_ioctl(struct net *net, void __user *arg) {
++	struct in6_ifreq ireq;
++	struct sockaddr_in6 sin6;
++
++	if (!capable(CAP_NET_ADMIN))
++		return -EACCES;
++
++	if (copy_from_user(&ireq, arg, sizeof(struct in6_ifreq)))
++		return -EFAULT;
++
++	sin6.sin6_family = AF_INET6;
++	ipv6_addr_copy(&sin6.sin6_addr, &ireq.ifr6_addr);
++	return tcp_nuke_addr(net, (struct sockaddr *) &sin6);
++}
++
+ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+ {
+ 	struct sock *sk = sock->sk;
+@@ -496,6 +528,8 @@
+ 		return addrconf_del_ifaddr(net, (void __user *) arg);
+ 	case SIOCSIFDSTADDR:
+ 		return addrconf_set_dstaddr(net, (void __user *) arg);
++	case SIOCKILLADDR:
++		return inet6_killaddr_ioctl(net, (void __user *) arg);
+ 	default:
+ 		if (!sk->sk_prot->ioctl)
+ 			return -ENOIOCTLCMD;
+diff -Naur g2-2.6.36/net/l2tp/l2tp_eth.c merged-2.6.36/net/l2tp/l2tp_eth.c
+--- g2-2.6.36/net/l2tp/l2tp_eth.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/l2tp/l2tp_eth.c	2011-08-09 08:49:41.000000000 -0700
+@@ -284,7 +284,7 @@
+ 	return 0;
+ }
+ 
+-static __net_initdata struct pernet_operations l2tp_eth_net_ops = {
++static struct pernet_operations l2tp_eth_net_ops = {
+ 	.init = l2tp_eth_init_net,
+ 	.id   = &l2tp_eth_net_id,
+ 	.size = sizeof(struct l2tp_eth_net),
+diff -Naur g2-2.6.36/net/rfkill/Kconfig merged-2.6.36/net/rfkill/Kconfig
+--- g2-2.6.36/net/rfkill/Kconfig	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/rfkill/Kconfig	2011-08-09 08:49:41.000000000 -0700
+@@ -10,6 +10,11 @@
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called rfkill.
+ 
++config RFKILL_PM
++	bool "Power off on suspend"
++	depends on RFKILL && PM
++	default y
++
+ # LED trigger support
+ config RFKILL_LEDS
+ 	bool
+diff -Naur g2-2.6.36/net/rfkill/core.c merged-2.6.36/net/rfkill/core.c
+--- g2-2.6.36/net/rfkill/core.c	2011-08-09 08:24:36.000000000 -0700
++++ merged-2.6.36/net/rfkill/core.c	2011-08-09 08:49:41.000000000 -0700
+@@ -783,6 +783,7 @@
+ }
+ EXPORT_SYMBOL(rfkill_pause_polling);
+ 
++#ifdef CONFIG_RFKILL_PM
+ void rfkill_resume_polling(struct rfkill *rfkill)
+ {
+ 	BUG_ON(!rfkill);
+@@ -817,14 +818,17 @@
+ 
+ 	return 0;
+ }
++#endif
+ 
+ static struct class rfkill_class = {
+ 	.name		= "rfkill",
+ 	.dev_release	= rfkill_release,
+ 	.dev_attrs	= rfkill_dev_attrs,
+ 	.dev_uevent	= rfkill_dev_uevent,
++#ifdef CONFIG_RFKILL_PM
+ 	.suspend	= rfkill_suspend,
+ 	.resume		= rfkill_resume,
++#endif
+ };
+ 
+ bool rfkill_blocked(struct rfkill *rfkill)
+diff -Naur g2-2.6.36/net/socket.c merged-2.6.36/net/socket.c
+--- g2-2.6.36/net/socket.c	2011-08-09 08:24:35.000000000 -0700
++++ merged-2.6.36/net/socket.c	2011-08-09 08:49:41.000000000 -0700
+@@ -564,7 +564,8 @@
+ 	if (err)
+ 		return err;
+ 
+-	return sock->ops->sendmsg(iocb, sock, msg, size);
++	err = sock->ops->sendmsg(iocb, sock, msg, size);
++	return err;
+ }
+ 
+ int sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
+@@ -680,6 +681,7 @@
+ static inline int __sock_recvmsg_nosec(struct kiocb *iocb, struct socket *sock,
+ 				       struct msghdr *msg, size_t size, int flags)
+ {
++	int err;
+ 	struct sock_iocb *si = kiocb_to_siocb(iocb);
+ 
+ 	sock_update_classid(sock->sk);
+@@ -690,7 +692,8 @@
+ 	si->size = size;
+ 	si->flags = flags;
+ 
+-	return sock->ops->recvmsg(iocb, sock, msg, size, flags);
++	err = sock->ops->recvmsg(iocb, sock, msg, size, flags);
++	return err;
+ }
+ 
+ static inline int __sock_recvmsg(struct kiocb *iocb, struct socket *sock,

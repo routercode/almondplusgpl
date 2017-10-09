@@ -1,0 +1,34 @@
+
+============================================================
+Disk Corruption Tester (dctest) version 2.1
+Copyright (C) 2003 Timothy A. Seufert (tas@mindspring.com)
+
+Start time: Thu Mar  3 17:44:31 2011
+
+Test parameters:
+	Test file size is 1 megabytes
+	1 test iteration
+	1 verification pass per test iteration
+
+Beginning test iteration #1; creating test file... (done)
+Completed test #1 verification pass #1 (OK)
+
+Finished testing, deleting test file.
+
+
+============================================================
+Disk Corruption Tester (dctest) version 2.1
+Copyright (C) 2003 Timothy A. Seufert (tas@mindspring.com)
+
+Start time: Thu Mar  3 17:44:54 2011
+
+Test parameters:
+	Test file size is 100 megabytes
+	1 test iteration
+	1 verification pass per test iteration
+
+Beginning test iteration #1; creating test file... (done)
+Completed test #1 verification pass #1 (OK)
+
+Finished testing, deleting test file.
+

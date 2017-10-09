@@ -1,0 +1,10 @@
+menu "Configuration"
+     depends on PACKAGE_kmod-g2-pcie
+
+config KERNEL_PCIE_EXTERNAL_CLOCK
+        bool "Use external clock for PCIe"
+        default y
+        help
+          Use external clock or internal clock for PCIe.
+
+endmenu

@@ -1,0 +1,47 @@
+menu "Character Devices"
+     depends on ARCH_GOLDENGATE
+
+config CS75XX_CIR
+        tristate "Cortina CS75XX Consumer Infrared"
+        depends on ARCH_GOLDENGATE
+        help
+          Say Y here if you want to use Cortina CS75XX Consumer Infrared
+          (CIR) 
+
+config CS75XX_PWC
+        tristate "Cortina CS75XX power supply"
+        depends on ARCH_GOLDENGATE
+        help
+          Say Y here to enable support for the power control provided by the
+          Cortina CS75XX.
+
+config CS75XX_REG_RW
+        tristate "Cortina CS75XX Read/Write Register "
+        help
+              Support to read/write register in command line for 
+              Cortex-A9 CPU on Cortina-Systems Baseboard.          
+
+config HW_RANDOM_CS75XX
+        tristate "Cortina CS75XX Random Number Generator support"
+        depends on ARCH_GOLDENGATE
+        select HW_RANDOM
+        ---help---
+          This driver provides kernel-side support for the Random Number
+          Generator hardware found on CS75XX Gate processors.
+
+          To compile this driver as a module, choose M here: the
+          module will be called cs75xx-rng.
+
+          If unsure, say Y.
+
+menu "Configuration"
+	depends on HW_RANDOM_CS75XX
+
+config TRNG_DIAG_ON
+	bool "Diagnostics"
+	default n
+	help
+	  Turn on diagnostics
+endmenu
+
+endmenu

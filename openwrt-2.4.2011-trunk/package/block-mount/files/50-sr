@@ -1,0 +1,30 @@
+#!/bin/sh
+# Copyright (C) 2009-2010 OpenWrt.org
+# Copyright (C) 2010 Vertical Communications
+# This is free software, licensed under the GNU General Public License v2.
+# See /LICENSE for more information.
+#
+
+. /lib/functions/block.sh
+
+blkdev=`dirname $DEVPATH`
+device=`basename $DEVPATH`
+
+[ `basename $blkdev` == "block" -a "${device:0:2}" != "sr" ] && return
+[ "${device:0:3}" == "ram" ] && return
+[ "${device:0:8}" == "mtdblock" ] && return
+[ "${device:0:2}" != "sr" ] && return
+
+
+
+case "$ACTION" in
+        add)
+                if_type="usb"
+                echo ${DEVPATH} | grep -q -e 'platform/goldengate-ahci' && { if_type="sata" ;}
+
+                /sbin/odd_polling $device $if_type &
+                ;;
+        remove)
+                kill `pgrep -f "odd_polling.*$device"`
+                ;;
+esac

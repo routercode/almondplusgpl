@@ -1,0 +1,20 @@
+diff -Naur old/drivers/Kconfig new/drivers/Kconfig
+--- old/drivers/Kconfig	2011-07-17 10:46:30.000000000 -0700
++++ new/drivers/Kconfig	2011-07-17 10:46:44.000000000 -0700
+@@ -2,6 +2,8 @@
+ 
+ source "drivers/base/Kconfig"
+ 
++source "drivers/cs752x/Kconfig"
++
+ source "drivers/connector/Kconfig"
+ 
+ source "drivers/mtd/Kconfig"
+diff -Naur old/drivers/Makefile new/drivers/Makefile
+--- old/drivers/Makefile	2011-07-17 10:46:22.000000000 -0700
++++ new/drivers/Makefile	2011-07-17 10:47:15.000000000 -0700
+@@ -115,3 +115,4 @@
+ obj-$(CONFIG_STAGING)		+= staging/
+ obj-y				+= platform/
+ obj-y				+= ieee802154/
++obj-$(CONFIG_ARCH_GOLDENGATE)   += cs752x/

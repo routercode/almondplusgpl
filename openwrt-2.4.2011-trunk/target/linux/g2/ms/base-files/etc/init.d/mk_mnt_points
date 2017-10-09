@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+
+# Start this before fstab (20)
+START=15
+
+mk_mnt_point() {
+  config_get mp "$1" target
+  if [ ! -z "$mp" ]; then
+      mkdir -p $mp
+  fi
+}
+
+start() {
+        config_load fstab
+        config_foreach mk_mnt_point mount
+}

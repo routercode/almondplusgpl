@@ -1,0 +1,206 @@
+menu "Networking"
+     depends on ARCH_GOLDENGATE
+
+config CS752X
+        tristate "Cortina CS752X Gigabit Ethernet support"
+	select NETDEV_1000
+        ---help---
+          This driver supports Cortina CS752x gigabit ethernet family of
+          adapters.  For more information on how to identify your adapter, go
+          to the Adapter & Driver ID Guide at:
+
+          <http://www.cortina-systems.com/>
+
+if CS752X
+
+config CS752X_HW_INTERNAL_BUFFERS
+        bool "Cortina CS752X Hardware Internal Buffers - 256kB"
+	default y
+        depends on CS752X
+        ---help---
+          When set gigabit ethernet ports and internal recirculation ports will
+          use onchip memory.  This removes DDR bandwidth consumption for packets
+          destined for those ports or sourced from them.
+          For more information on how to identify your adapter, go
+          to the Adapter & Driver ID Guide at:
+
+          <http://www.cortina-systems.com/>
+
+
+config CS752X_HW_INTERNAL_BUFFERS_HALF_SIZE
+        bool "Cortina CS752X HW HALF SIZE Internal Buffers 128kB instead"
+	default n
+        depends on CS752X_HW_INTERNAL_BUFFERS
+        ---help---
+	  When set the lower half of the memory will be used for the queue manager
+	  and the upper half of memory will be available to CPUs or whatever 
+	  purpose desired. This means that the buffer depth also for the QM
+	  will be 128kB instead of the larger 256kB and may suffer from
+	  dropped packets on jumbo sized frames when all ports are active.
+	  
+          For more information on how to identify your adapter, go
+          to the Adapter & Driver ID Guide at:
+
+          <http://www.cortina-systems.com/>
+
+config CS752X_HW_INTERNAL_BUFFERS_192_SIZE
+        bool "Cortina CS752X HW HALF SIZE Internal Buffers 192kB instead"
+	default n
+        depends on CS752X_HW_INTERNAL_BUFFERS
+        ---help---
+	  When set 192kB of Packet buffer memory will be used for packet 
+	  storage.  The remaining 64kB is available for general purpose CPU
+	  or Recirculation Engine processing.
+	  
+          For more information on how to identify your adapter, go
+          to the Adapter & Driver ID Guide at:
+
+          <http://www.cortina-systems.com/>
+
+config CS752X_HW_INTERNAL_BUFFERS_RECIRCULATION
+        bool "Cortina CS752X HW Recirculation Internal Buffers"
+	default n
+        depends on CS752X_HW_INTERNAL_BUFFERS
+        ---help---
+	  Will use onchip shared internal buffers for recirculation engine
+	  instead of the external.  The advantage is a saving of B/W for
+	  traffic that is destined for the recirculation engine.  The
+	  disadvantage is that the queue depth is very shallow so if the
+	  recirculation engine task is complex and takes time packets may
+	  drop.
+	  
+          For more information on how to identify your adapter, go
+          to the Adapter & Driver ID Guide at:
+
+          <http://www.cortina-systems.com/>
+
+
+config CS752X_HW_ACCELERATION
+        tristate "Cortina CS752X Hardware Acceleration support"
+	default n
+        depends on CS752X
+        ---help---
+          This driver supports Cortina CS752x chip family of hardware acceleration
+          adapters.  For more information on how to identify your adapter, go
+          to the Adapter & Driver ID Guide at:
+
+          <http://www.cortina-systems.com/>
+
+config CS752X_HW_ACCELERATION_IPSEC
+        tristate "Cortina CS752X Hardware IPsec Acceleration support"
+	default n
+        depends on CS752X && CS752X_HW_ACCELERATION
+        ---help---
+          This driver supports Cortina CS752x chip family of hardware acceleration
+          adapters.  For more information on how to identify your adapter, go
+          to the Adapter & Driver ID Guide at:
+
+          <http://www.cortina-systems.com/>
+
+config CS752X_VIRTUAL_NETWORK_INTERFACE
+        bool "Cortina CS752X Virtual Network Interface"
+        default n
+        depends on CS752X
+        ---help---
+          This driver supports Cortina CS752x chip family of built-in virtual
+          network interfaces. For more information on how to identify your
+          adapter, go to the Adapter & Driver ID Guide at:
+
+          <http://www.cortina-systems.com/>
+
+choice
+        prompt "Attribute that Virtual Interfaces based on"
+        default CS752X_VIRTUAL_NI_CPUTAG
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE
+
+config CS752X_VIRTUAL_NI_CPUTAG
+        bool "Realtek CPU TAG at the end of packet"
+        help
+          This will create the virtual interfaces that based on the port_mask
+          in Realtek CPU tag that is appended at the end of each packet.
+
+config CS752X_VIRTUAL_NI_DBLTAG
+        bool "SVLAN tag that is always at the outer VLAN tag"
+        help
+          This will create the virtual interfaces that based on the VLAN ID
+          of outer VLAN (SVLAN) header in each packet.
+
+endchoice
+
+config CS752X_VIRTUAL_ETH0
+        bool "Cortina CS752X Virtual Network Interface on eth0 (MAC#0)"
+        default n
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE
+        ---help---
+          This driver supports Cortina CS752x chip family of built-in virtual
+          network interfaces on eth0.
+
+config CS752X_NR_VIRTUAL_ETH0
+        int "Number of Virtual Interfaces created on eth0 (1-80)"
+        range 1 80
+        default "4"
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE && \
+                CS752X_VIRTUAL_ETH0
+
+config CS752X_VID_START_ETH0
+        int "The starting VLAN ID for the virtual interfaces (1 - 255)"
+        range 1 255
+        default "100"
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE && \
+                CS752X_VIRTUAL_ETH0 && CS752X_VIRTUAL_NI_DBLTAG
+
+config CS752X_VIRTUAL_ETH1
+        bool "Cortina CS752X Virtual Network Interface on eth1 (MAC#1)"
+        default n
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE
+        ---help---
+          This driver supports Cortina CS752x chip family of built-in virtual
+          network interfaces on eth1.
+
+config CS752X_NR_VIRTUAL_ETH1
+        int "Number of Virtual Interfaces created on eth1 (1-80)"
+        range 1 80
+        default "4"
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE && \
+                CS752X_VIRTUAL_ETH1
+
+config CS752X_VID_START_ETH1
+        int "The starting VLAN ID for the virtual interfaces (1 - 255)"
+        range 1 255
+        default "100"
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE && \
+                CS752X_VIRTUAL_ETH1 && CS752X_VIRTUAL_NI_DBLTAG
+
+config CS752X_VIRTUAL_ETH2
+        bool "Cortina CS752X Virtual Network Interface on eth2 (MAC#2)"
+        default n
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE
+        ---help---
+          This driver supports Cortina CS752x chip family of built-in virtual
+          network interfaces on eth2.
+
+config CS752X_NR_VIRTUAL_ETH2
+        int "Number of Virtual Interfaces created on eth2 (1-80)"
+        range 1 80
+        default "4"
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE && \
+                CS752X_VIRTUAL_ETH2
+
+config CS752X_VID_START_ETH2
+        int "The starting VLAN ID for the virtual interfaces (1 - 255)"
+        range 1 255
+        default "100"
+        depends on CS752X && CS752X_VIRTUAL_NETWORK_INTERFACE && \
+                CS752X_VIRTUAL_ETH2 && CS752X_VIRTUAL_NI_DBLTAG
+
+config CS75XX_FE_TBL_MGMT_UT
+        tristate "Unit Test of FE Table Management support"
+	default n
+        depends on CS752X
+        ---help---
+          This module support to test table management funtions of 
+          forwarding engine. It covers basic test, boundary test, mixed
+          operations, and combination of multiple tables.
+
+endif
+endmenu

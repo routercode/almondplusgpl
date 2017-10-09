@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2008-2010 OpenWrt.org
+
+. /etc/functions.sh
+
+START=60
+
+start() {
+	config_load neSendCmd
+	config_get_bool "enabled" "$section" "enabled" '1'
+	[ "$enabled" -gt 0 ] && /sbin/neSendCmd -p /etc &
+}
+
+stop() {
+	killall neSendCmd
+}

@@ -1,0 +1,15 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+boot() {
+##	/etc/cs75xx/hw_accel/demo/start.sh > /dev/console
+	ln -s /etc/cs75xx/hw_accel/demo/cs_dp_mode_save /sbin/cs_dp_mode_save
+	ln -s /etc/cs75xx/hw_accel/demo/cs_dp_mode_set /sbin/cs_dp_mode_set
+}
+
+start() {
+##	/etc/cs75xx/hw_accel/demo/start.sh
+	ln -s /etc/cs75xx/hw_accel/demo/cs_dp_mode_save /sbin/cs_dp_mode_save
+	ln -s /etc/cs75xx/hw_accel/demo/cs_dp_mode_sset /sbin/cs_dp_mode_set
+}

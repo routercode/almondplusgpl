@@ -1,0 +1,3113 @@
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/boot/compressed/head.S linux-arm/arch/arm/boot/compressed/head.S
+--- linux-2.6.36/arch/arm/boot/compressed/head.S	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/boot/compressed/head.S	2011-02-07 13:36:02.000000000 +0530
+@@ -174,7 +174,9 @@
+ 		ldr	sp, [r0, #28]
+ #ifdef CONFIG_AUTO_ZRELADDR
+ 		@ determine final kernel image address
+-		and	r4, pc, #0xf8000000
++ ARM(		and	r4, pc, #0xf8000000	)
++ THUMB(		mov	r4, pc			)
++ THUMB(		and	r4, r4, #0xf8000000	)
+ 		add	r4, r4, #TEXT_OFFSET
+ #else
+ 		ldr	r4, =zreladdr
+@@ -445,7 +447,9 @@
+  */
+ 		mov	r1, #0x1e
+ 		orr	r1, r1, #3 << 10
+-		mov	r2, pc, lsr #20
++ ARM(		mov	r2, pc, lsr #20		)
++ THUMB(		mov	r2, pc			)
++ THUMB(		lsr	r2, r2, #20		)
+ 		orr	r1, r1, r2, lsl #20
+ 		add	r0, r3, r2, lsl #2
+ 		str	r1, [r0], #4
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/assembler.h linux-arm/arch/arm/include/asm/assembler.h
+--- linux-2.6.36/arch/arm/include/asm/assembler.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/assembler.h	2011-02-07 13:36:02.000000000 +0530
+@@ -18,6 +18,7 @@
+ #endif
+ 
+ #include <asm/ptrace.h>
++#include <asm/domain.h>
+ 
+ /*
+  * Endian independent macros for shifting bytes within registers.
+@@ -183,12 +184,12 @@
+  */
+ #ifdef CONFIG_THUMB2_KERNEL
+ 
+-	.macro	usraccoff, instr, reg, ptr, inc, off, cond, abort
++	.macro	usraccoff, instr, reg, ptr, inc, off, cond, abort, t=T()
+ 9999:
+ 	.if	\inc == 1
+-	\instr\cond\()bt \reg, [\ptr, #\off]
++	\instr\cond\()b\()\t\().w \reg, [\ptr, #\off]
+ 	.elseif	\inc == 4
+-	\instr\cond\()t \reg, [\ptr, #\off]
++	\instr\cond\()\t\().w \reg, [\ptr, #\off]
+ 	.else
+ 	.error	"Unsupported inc macro argument"
+ 	.endif
+@@ -215,7 +216,7 @@
+ 	@ Slightly optimised to avoid incrementing the pointer twice
+ 	usraccoff \instr, \reg, \ptr, \inc, 0, \cond, \abort
+ 	.if	\rept == 2
+-	usraccoff \instr, \reg, \ptr, \inc, 4, \cond, \abort
++	usraccoff \instr, \reg, \ptr, \inc, \inc, \cond, \abort
+ 	.endif
+ 
+ 	add\cond \ptr, #\rept * \inc
+@@ -223,13 +224,13 @@
+ 
+ #else	/* !CONFIG_THUMB2_KERNEL */
+ 
+-	.macro	usracc, instr, reg, ptr, inc, cond, rept, abort
++	.macro	usracc, instr, reg, ptr, inc, cond, rept, abort, t=T()
+ 	.rept	\rept
+ 9999:
+ 	.if	\inc == 1
+-	\instr\cond\()bt \reg, [\ptr], #\inc
++	\instr\cond\()b\()\t \reg, [\ptr], #\inc
+ 	.elseif	\inc == 4
+-	\instr\cond\()t \reg, [\ptr], #\inc
++	\instr\cond\()\t \reg, [\ptr], #\inc
+ 	.else
+ 	.error	"Unsupported inc macro argument"
+ 	.endif
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/cacheflush.h linux-arm/arch/arm/include/asm/cacheflush.h
+--- linux-2.6.36/arch/arm/include/asm/cacheflush.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/cacheflush.h	2011-02-07 13:36:02.000000000 +0530
+@@ -137,10 +137,10 @@
+ #endif
+ 
+ /*
+- * This flag is used to indicate that the page pointed to by a pte
+- * is dirty and requires cleaning before returning it to the user.
++ * This flag is used to indicate that the page pointed to by a pte is clean
++ * and does not require cleaning before returning it to the user.
+  */
+-#define PG_dcache_dirty PG_arch_1
++#define PG_dcache_clean PG_arch_1
+ 
+ /*
+  *	MM Cache Management
+@@ -405,9 +405,6 @@
+ #define ARCH_HAS_FLUSH_KERNEL_DCACHE_PAGE
+ static inline void flush_kernel_dcache_page(struct page *page)
+ {
+-	/* highmem pages are always flushed upon kunmap already */
+-	if ((cache_is_vivt() || cache_is_vipt_aliasing()) && !PageHighMem(page))
+-		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+ }
+ 
+ #define flush_dcache_mmap_lock(mapping) \
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/cachetype.h linux-arm/arch/arm/include/asm/cachetype.h
+--- linux-2.6.36/arch/arm/include/asm/cachetype.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/cachetype.h	2011-02-07 13:36:02.000000000 +0530
+@@ -6,6 +6,7 @@
+ #define CACHEID_VIPT_ALIASING		(1 << 2)
+ #define CACHEID_VIPT			(CACHEID_VIPT_ALIASING|CACHEID_VIPT_NONALIASING)
+ #define CACHEID_ASID_TAGGED		(1 << 3)
++#define CACHEID_VIPT_I_ALIASING		(1 << 4)
+ 
+ extern unsigned int cacheid;
+ 
+@@ -14,15 +15,18 @@
+ #define cache_is_vipt_nonaliasing()	cacheid_is(CACHEID_VIPT_NONALIASING)
+ #define cache_is_vipt_aliasing()	cacheid_is(CACHEID_VIPT_ALIASING)
+ #define icache_is_vivt_asid_tagged()	cacheid_is(CACHEID_ASID_TAGGED)
++#define icache_is_vipt_aliasing()	cacheid_is(CACHEID_VIPT_I_ALIASING)
+ 
+ /*
+  * __LINUX_ARM_ARCH__ is the minimum supported CPU architecture
+  * Mask out support which will never be present on newer CPUs.
+  * - v6+ is never VIVT
+- * - v7+ VIPT never aliases
++ * - v7+ VIPT never aliases on D-side
+  */
+ #if __LINUX_ARM_ARCH__ >= 7
+-#define __CACHEID_ARCH_MIN	(CACHEID_VIPT_NONALIASING | CACHEID_ASID_TAGGED)
++#define __CACHEID_ARCH_MIN	(CACHEID_VIPT_NONALIASING |\
++				 CACHEID_ASID_TAGGED |\
++				 CACHEID_VIPT_I_ALIASING)
+ #elif __LINUX_ARM_ARCH__ >= 6
+ #define	__CACHEID_ARCH_MIN	(~CACHEID_VIVT)
+ #else
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/domain.h linux-arm/arch/arm/include/asm/domain.h
+--- linux-2.6.36/arch/arm/include/asm/domain.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/domain.h	2011-02-07 13:36:02.000000000 +0530
+@@ -45,13 +45,17 @@
+  */
+ #define DOMAIN_NOACCESS	0
+ #define DOMAIN_CLIENT	1
++#ifdef CONFIG_CPU_USE_DOMAINS
+ #define DOMAIN_MANAGER	3
++#else
++#define DOMAIN_MANAGER	1
++#endif
+ 
+ #define domain_val(dom,type)	((type) << (2*(dom)))
+ 
+ #ifndef __ASSEMBLY__
+ 
+-#ifdef CONFIG_MMU
++#ifdef CONFIG_CPU_USE_DOMAINS
+ #define set_domain(x)					\
+ 	do {						\
+ 	__asm__ __volatile__(				\
+@@ -74,5 +78,28 @@
+ #define modify_domain(dom,type)	do { } while (0)
+ #endif
+ 
++/*
++ * Generate the T (user) versions of the LDR/STR and related
++ * instructions (inline assembly)
++ */
++#ifdef CONFIG_CPU_USE_DOMAINS
++#define T(instr)	#instr "t"
++#else
++#define T(instr)	#instr
+ #endif
+-#endif /* !__ASSEMBLY__ */
++
++#else /* __ASSEMBLY__ */
++
++/*
++ * Generate the T (user) versions of the LDR/STR and related
++ * instructions
++ */
++#ifdef CONFIG_CPU_USE_DOMAINS
++#define T(instr)	instr ## t
++#else
++#define T(instr)	instr
++#endif
++
++#endif /* __ASSEMBLY__ */
++
++#endif /* !__ASM_PROC_DOMAIN_H */
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/futex.h linux-arm/arch/arm/include/asm/futex.h
+--- linux-2.6.36/arch/arm/include/asm/futex.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/futex.h	2011-02-07 13:36:02.000000000 +0530
+@@ -13,12 +13,13 @@
+ #include <linux/preempt.h>
+ #include <linux/uaccess.h>
+ #include <asm/errno.h>
++#include <asm/domain.h>
+ 
+ #define __futex_atomic_op(insn, ret, oldval, uaddr, oparg)	\
+ 	__asm__ __volatile__(					\
+-	"1:	ldrt	%1, [%2]\n"				\
++	"1:	" T(ldr) "	%1, [%2]\n"			\
+ 	"	" insn "\n"					\
+-	"2:	strt	%0, [%2]\n"				\
++	"2:	" T(str) "	%0, [%2]\n"			\
+ 	"	mov	%0, #0\n"				\
+ 	"3:\n"							\
+ 	"	.pushsection __ex_table,\"a\"\n"		\
+@@ -97,10 +98,10 @@
+ 	pagefault_disable();	/* implies preempt_disable() */
+ 
+ 	__asm__ __volatile__("@futex_atomic_cmpxchg_inatomic\n"
+-	"1:	ldrt	%0, [%3]\n"
++	"1:	" T(ldr) "	%0, [%3]\n"
+ 	"	teq	%0, %1\n"
+ 	"	it	eq	@ explicit IT needed for the 2b label\n"
+-	"2:	streqt	%2, [%3]\n"
++	"2:	" T(streq) "	%2, [%3]\n"
+ 	"3:\n"
+ 	"	.pushsection __ex_table,\"a\"\n"
+ 	"	.align	3\n"
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/hw_breakpoint.h linux-arm/arch/arm/include/asm/hw_breakpoint.h
+--- linux-2.6.36/arch/arm/include/asm/hw_breakpoint.h	1970-01-01 05:30:00.000000000 +0530
++++ linux-arm/arch/arm/include/asm/hw_breakpoint.h	2011-02-07 13:36:02.000000000 +0530
+@@ -0,0 +1,133 @@
++#ifndef _ARM_HW_BREAKPOINT_H
++#define _ARM_HW_BREAKPOINT_H
++
++#ifdef __KERNEL__
++
++struct task_struct;
++
++#ifdef CONFIG_HAVE_HW_BREAKPOINT
++
++struct arch_hw_breakpoint_ctrl {
++		u32 __reserved	: 9,
++		mismatch	: 1,
++				: 9,
++		len		: 8,
++		type		: 2,
++		privilege	: 2,
++		enabled		: 1;
++};
++
++struct arch_hw_breakpoint {
++	u32	address;
++	u32	trigger;
++	struct perf_event *suspended_wp;
++	struct arch_hw_breakpoint_ctrl ctrl;
++};
++
++static inline u32 encode_ctrl_reg(struct arch_hw_breakpoint_ctrl ctrl)
++{
++	return (ctrl.mismatch << 22) | (ctrl.len << 5) | (ctrl.type << 3) |
++		(ctrl.privilege << 1) | ctrl.enabled;
++}
++
++static inline void decode_ctrl_reg(u32 reg,
++				   struct arch_hw_breakpoint_ctrl *ctrl)
++{
++	ctrl->enabled	= reg & 0x1;
++	reg >>= 1;
++	ctrl->privilege	= reg & 0x3;
++	reg >>= 2;
++	ctrl->type	= reg & 0x3;
++	reg >>= 2;
++	ctrl->len	= reg & 0xff;
++	reg >>= 17;
++	ctrl->mismatch	= reg & 0x1;
++}
++
++/* Debug architecture numbers. */
++#define ARM_DEBUG_ARCH_RESERVED	0	/* In case of ptrace ABI updates. */
++#define ARM_DEBUG_ARCH_V6	1
++#define ARM_DEBUG_ARCH_V6_1	2
++#define ARM_DEBUG_ARCH_V7_ECP14	3
++#define ARM_DEBUG_ARCH_V7_MM	4
++
++/* Breakpoint */
++#define ARM_BREAKPOINT_EXECUTE	0
++
++/* Watchpoints */
++#define ARM_BREAKPOINT_LOAD	1
++#define ARM_BREAKPOINT_STORE	2
++
++/* Privilege Levels */
++#define ARM_BREAKPOINT_PRIV	1
++#define ARM_BREAKPOINT_USER	2
++
++/* Lengths */
++#define ARM_BREAKPOINT_LEN_1	0x1
++#define ARM_BREAKPOINT_LEN_2	0x3
++#define ARM_BREAKPOINT_LEN_4	0xf
++#define ARM_BREAKPOINT_LEN_8	0xff
++
++/* Limits */
++#define ARM_MAX_BRP		16
++#define ARM_MAX_WRP		16
++#define ARM_MAX_HBP_SLOTS	(ARM_MAX_BRP + ARM_MAX_WRP)
++
++/* DSCR method of entry bits. */
++#define ARM_DSCR_MOE(x)			((x >> 2) & 0xf)
++#define ARM_ENTRY_BREAKPOINT		0x1
++#define ARM_ENTRY_ASYNC_WATCHPOINT	0x2
++#define ARM_ENTRY_SYNC_WATCHPOINT	0xa
++
++/* DSCR monitor/halting bits. */
++#define ARM_DSCR_HDBGEN		(1 << 14)
++#define ARM_DSCR_MDBGEN		(1 << 15)
++
++/* opcode2 numbers for the co-processor instructions. */
++#define ARM_OP2_BVR		4
++#define ARM_OP2_BCR		5
++#define ARM_OP2_WVR		6
++#define ARM_OP2_WCR		7
++
++/* Base register numbers for the debug registers. */
++#define ARM_BASE_BVR		64
++#define ARM_BASE_BCR		80
++#define ARM_BASE_WVR		96
++#define ARM_BASE_WCR		112
++
++/* Accessor macros for the debug registers. */
++#define ARM_DBG_READ(M, OP2, VAL) do {\
++	asm volatile("mrc p14, 0, %0, c0," #M ", " #OP2 : "=r" (VAL));\
++} while (0)
++
++#define ARM_DBG_WRITE(M, OP2, VAL) do {\
++	asm volatile("mcr p14, 0, %0, c0," #M ", " #OP2 : : "r" (VAL));\
++} while (0)
++
++struct notifier_block;
++struct perf_event;
++struct pmu;
++
++extern struct pmu perf_ops_bp;
++extern int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
++				  int *gen_len, int *gen_type);
++extern int arch_check_bp_in_kernelspace(struct perf_event *bp);
++extern int arch_validate_hwbkpt_settings(struct perf_event *bp);
++extern int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
++					   unsigned long val, void *data);
++
++extern u8 arch_get_debug_arch(void);
++extern u8 arch_get_max_wp_len(void);
++extern void clear_ptrace_hw_breakpoint(struct task_struct *tsk);
++
++int arch_install_hw_breakpoint(struct perf_event *bp);
++void arch_uninstall_hw_breakpoint(struct perf_event *bp);
++void hw_breakpoint_pmu_read(struct perf_event *bp);
++int hw_breakpoint_slots(int type);
++
++#else
++static inline void clear_ptrace_hw_breakpoint(struct task_struct *tsk) {}
++
++#endif	/* CONFIG_HAVE_HW_BREAKPOINT */
++#endif	/* __KERNEL__ */
++#endif	/* _ARM_HW_BREAKPOINT_H */
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/pgtable.h linux-arm/arch/arm/include/asm/pgtable.h
+--- linux-2.6.36/arch/arm/include/asm/pgtable.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/pgtable.h	2011-02-07 13:36:02.000000000 +0530
+@@ -278,9 +278,24 @@
+ 
+ #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
+ 
+-#define set_pte_at(mm,addr,ptep,pteval) do { \
+-	set_pte_ext(ptep, pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
+- } while (0)
++#if __LINUX_ARM_ARCH__ < 6
++static inline void __sync_icache_dcache(pte_t pteval)
++{
++}
++#else
++extern void __sync_icache_dcache(pte_t pteval);
++#endif
++
++static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
++			      pte_t *ptep, pte_t pteval)
++{
++	if (addr >= TASK_SIZE)
++		set_pte_ext(ptep, pteval, 0);
++	else {
++		__sync_icache_dcache(pteval);
++		set_pte_ext(ptep, pteval, PTE_EXT_NG);
++	}
++}
+ 
+ /*
+  * The following only work if pte_present() is true.
+@@ -290,8 +305,13 @@
+ #define pte_write(pte)		(pte_val(pte) & L_PTE_WRITE)
+ #define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
+ #define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
++#define pte_exec(pte)		(pte_val(pte) & L_PTE_EXEC)
+ #define pte_special(pte)	(0)
+ 
++#define pte_present_user(pte) \
++	((pte_val(pte) & (L_PTE_PRESENT | L_PTE_USER)) == \
++	 (L_PTE_PRESENT | L_PTE_USER))
++
+ #define PTE_BIT_FUNC(fn,op) \
+ static inline pte_t pte_##fn(pte_t pte) { pte_val(pte) op; return pte; }
+ 
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/processor.h linux-arm/arch/arm/include/asm/processor.h
+--- linux-2.6.36/arch/arm/include/asm/processor.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/processor.h	2011-02-07 13:36:02.000000000 +0530
+@@ -19,6 +19,7 @@
+ 
+ #ifdef __KERNEL__
+ 
++#include <asm/hw_breakpoint.h>
+ #include <asm/ptrace.h>
+ #include <asm/types.h>
+ 
+@@ -41,6 +42,9 @@
+ struct debug_info {
+ 	int			nsaved;
+ 	struct debug_entry	bp[2];
++#ifdef CONFIG_HAVE_HW_BREAKPOINT
++	struct perf_event	*hbp[ARM_MAX_HBP_SLOTS];
++#endif
+ };
+ 
+ struct thread_struct {
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/ptrace.h linux-arm/arch/arm/include/asm/ptrace.h
+--- linux-2.6.36/arch/arm/include/asm/ptrace.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/ptrace.h	2011-02-07 13:36:02.000000000 +0530
+@@ -29,6 +29,8 @@
+ #define PTRACE_SETCRUNCHREGS	26
+ #define PTRACE_GETVFPREGS	27
+ #define PTRACE_SETVFPREGS	28
++#define PTRACE_GETHBPREGS	29
++#define PTRACE_SETHBPREGS	30
+ 
+ /*
+  * PSR bits
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/smp_plat.h linux-arm/arch/arm/include/asm/smp_plat.h
+--- linux-2.6.36/arch/arm/include/asm/smp_plat.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/smp_plat.h	2011-02-07 13:36:02.000000000 +0530
+@@ -13,9 +13,13 @@
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 2;
+ }
+ 
++#if !defined(CONFIG_SMP) || __LINUX_ARM_ARCH__ >= 7
++#define cache_ops_need_broadcast()	0
++#else
+ static inline int cache_ops_need_broadcast(void)
+ {
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
+ }
++#endif
+ 
+ #endif
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/system.h linux-arm/arch/arm/include/asm/system.h
+--- linux-2.6.36/arch/arm/include/asm/system.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/system.h	2011-02-07 13:36:02.000000000 +0530
+@@ -85,6 +85,10 @@
+ 				       struct pt_regs *),
+ 		     int sig, int code, const char *name);
+ 
++void hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int,
++				       struct pt_regs *),
++		     int sig, int code, const char *name);
++
+ #define xchg(ptr,x) \
+ 	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
+ 
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/tlbflush.h linux-arm/arch/arm/include/asm/tlbflush.h
+--- linux-2.6.36/arch/arm/include/asm/tlbflush.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/tlbflush.h	2011-02-07 13:36:02.000000000 +0530
+@@ -560,12 +560,20 @@
+ #endif
+ 
+ /*
+- * if PG_dcache_dirty is set for the page, we need to ensure that any
++ * If PG_dcache_clean is not set for the page, we need to ensure that any
+  * cache entries for the kernels virtual memory range are written
+- * back to the page.
++ * back to the page. On ARMv6 and later, the cache coherency is handled via
++ * the set_pte_at() function.
+  */
++#if __LINUX_ARM_ARCH__ < 6
+ extern void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
+ 	pte_t *ptep);
++#else
++static inline void update_mmu_cache(struct vm_area_struct *vma,
++				    unsigned long addr, pte_t *ptep)
++{
++}
++#endif
+ 
+ #endif
+ 
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/traps.h linux-arm/arch/arm/include/asm/traps.h
+--- linux-2.6.36/arch/arm/include/asm/traps.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/traps.h	2011-02-07 13:36:02.000000000 +0530
+@@ -27,4 +27,6 @@
+ extern void __init early_trap_init(void);
+ extern void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame);
+ 
++extern void *vectors_page;
++
+ #endif
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/include/asm/uaccess.h linux-arm/arch/arm/include/asm/uaccess.h
+--- linux-2.6.36/arch/arm/include/asm/uaccess.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/include/asm/uaccess.h	2011-02-07 13:36:02.000000000 +0530
+@@ -227,7 +227,7 @@
+ 
+ #define __get_user_asm_byte(x,addr,err)				\
+ 	__asm__ __volatile__(					\
+-	"1:	ldrbt	%1,[%2]\n"				\
++	"1:	" T(ldrb) "	%1,[%2],#0\n"			\
+ 	"2:\n"							\
+ 	"	.pushsection .fixup,\"ax\"\n"			\
+ 	"	.align	2\n"					\
+@@ -263,7 +263,7 @@
+ 
+ #define __get_user_asm_word(x,addr,err)				\
+ 	__asm__ __volatile__(					\
+-	"1:	ldrt	%1,[%2]\n"				\
++	"1:	" T(ldr) "	%1,[%2],#0\n"			\
+ 	"2:\n"							\
+ 	"	.pushsection .fixup,\"ax\"\n"			\
+ 	"	.align	2\n"					\
+@@ -308,7 +308,7 @@
+ 
+ #define __put_user_asm_byte(x,__pu_addr,err)			\
+ 	__asm__ __volatile__(					\
+-	"1:	strbt	%1,[%2]\n"				\
++	"1:	" T(strb) "	%1,[%2],#0\n"			\
+ 	"2:\n"							\
+ 	"	.pushsection .fixup,\"ax\"\n"			\
+ 	"	.align	2\n"					\
+@@ -341,7 +341,7 @@
+ 
+ #define __put_user_asm_word(x,__pu_addr,err)			\
+ 	__asm__ __volatile__(					\
+-	"1:	strt	%1,[%2]\n"				\
++	"1:	" T(str) "	%1,[%2],#0\n"			\
+ 	"2:\n"							\
+ 	"	.pushsection .fixup,\"ax\"\n"			\
+ 	"	.align	2\n"					\
+@@ -366,10 +366,10 @@
+ 
+ #define __put_user_asm_dword(x,__pu_addr,err)			\
+ 	__asm__ __volatile__(					\
+- ARM(	"1:	strt	" __reg_oper1 ", [%1], #4\n"	)	\
+- ARM(	"2:	strt	" __reg_oper0 ", [%1]\n"	)	\
+- THUMB(	"1:	strt	" __reg_oper1 ", [%1]\n"	)	\
+- THUMB(	"2:	strt	" __reg_oper0 ", [%1, #4]\n"	)	\
++ ARM(	"1:	" T(str) "	" __reg_oper1 ", [%1], #4\n"	)	\
++ ARM(	"2:	" T(str) "	" __reg_oper0 ", [%1]\n"	)	\
++ THUMB(	"1:	" T(str) "	" __reg_oper1 ", [%1]\n"	)	\
++ THUMB(	"2:	" T(str) "	" __reg_oper0 ", [%1, #4]\n"	)	\
+ 	"3:\n"							\
+ 	"	.pushsection .fixup,\"ax\"\n"			\
+ 	"	.align	2\n"					\
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/Kconfig linux-arm/arch/arm/Kconfig
+--- linux-2.6.36/arch/arm/Kconfig	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/Kconfig	2011-02-07 13:36:02.000000000 +0530
+@@ -13,7 +13,7 @@
+ 	select HAVE_MEMBLOCK
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
+-	select GENERIC_ATOMIC64 if (!CPU_32v6K)
++	select GENERIC_ATOMIC64 if (!CPU_32v6K || !AEABI)
+ 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_KPROBES if (!XIP_KERNEL)
+@@ -26,6 +26,7 @@
+ 	select HAVE_PERF_EVENTS
+ 	select PERF_USE_VMALLOC
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
++	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V7))
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/entry-armv.S linux-arm/arch/arm/kernel/entry-armv.S
+--- linux-2.6.36/arch/arm/kernel/entry-armv.S	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/entry-armv.S	2011-02-07 13:36:02.000000000 +0530
+@@ -733,7 +733,7 @@
+  THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
+  THUMB(	str	sp, [ip], #4		   )
+  THUMB(	str	lr, [ip], #4		   )
+-#ifdef CONFIG_MMU
++#ifdef CONFIG_CPU_USE_DOMAINS
+ 	ldr	r6, [r2, #TI_CPU_DOMAIN]
+ #endif
+ 	set_tls	r3, r4, r5
+@@ -742,7 +742,7 @@
+ 	ldr	r8, =__stack_chk_guard
+ 	ldr	r7, [r7, #TSK_STACK_CANARY]
+ #endif
+-#ifdef CONFIG_MMU
++#ifdef CONFIG_CPU_USE_DOMAINS
+ 	mcr	p15, 0, r6, c3, c0, 0		@ Set domain register
+ #endif
+ 	mov	r5, r0
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/fiq.c linux-arm/arch/arm/kernel/fiq.c
+--- linux-2.6.36/arch/arm/kernel/fiq.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/fiq.c	2011-02-07 13:36:02.000000000 +0530
+@@ -45,6 +45,7 @@
+ #include <asm/fiq.h>
+ #include <asm/irq.h>
+ #include <asm/system.h>
++#include <asm/traps.h>
+ 
+ static unsigned long no_fiq_insn;
+ 
+@@ -77,7 +78,11 @@
+ 
+ void set_fiq_handler(void *start, unsigned int length)
+ {
++#if defined(CONFIG_CPU_USE_DOMAINS)
+ 	memcpy((void *)0xffff001c, start, length);
++#else
++	memcpy(vectors_page + 0x1c, start, length);
++#endif
+ 	flush_icache_range(0xffff001c, 0xffff001c + length);
+ 	if (!vectors_high())
+ 		flush_icache_range(0x1c, 0x1c + length);
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/hw_breakpoint.c linux-arm/arch/arm/kernel/hw_breakpoint.c
+--- linux-2.6.36/arch/arm/kernel/hw_breakpoint.c	1970-01-01 05:30:00.000000000 +0530
++++ linux-arm/arch/arm/kernel/hw_breakpoint.c	2011-02-07 13:36:02.000000000 +0530
+@@ -0,0 +1,849 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++ *
++ * Copyright (C) 2009, 2010 ARM Limited
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ */
++
++/*
++ * HW_breakpoint: a unified kernel/user-space hardware breakpoint facility,
++ * using the CPU's debug registers.
++ */
++#define pr_fmt(fmt) "hw-breakpoint: " fmt
++
++#include <linux/errno.h>
++#include <linux/perf_event.h>
++#include <linux/hw_breakpoint.h>
++#include <linux/smp.h>
++
++#include <asm/cacheflush.h>
++#include <asm/cputype.h>
++#include <asm/current.h>
++#include <asm/hw_breakpoint.h>
++#include <asm/kdebug.h>
++#include <asm/system.h>
++#include <asm/traps.h>
++
++/* Breakpoint currently in use for each BRP. */
++static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
++
++/* Watchpoint currently in use for each WRP. */
++static DEFINE_PER_CPU(struct perf_event *, wp_on_reg[ARM_MAX_WRP]);
++
++/* Number of BRP/WRP registers on this CPU. */
++static int core_num_brps;
++static int core_num_wrps;
++
++/* Debug architecture version. */
++static u8 debug_arch;
++
++/* Maximum supported watchpoint length. */
++static u8 max_watchpoint_len;
++
++/* Determine number of BRP registers available. */
++static int get_num_brps(void)
++{
++	u32 didr;
++	ARM_DBG_READ(c0, 0, didr);
++	return ((didr >> 24) & 0xf) + 1;
++}
++
++/* Determine number of WRP registers available. */
++static int get_num_wrps(void)
++{
++	/*
++	 * FIXME: When a watchpoint fires, the only way to work out which
++	 * watchpoint it was is by disassembling the faulting instruction
++	 * and working out the address of the memory access.
++	 *
++	 * Furthermore, we can only do this if the watchpoint was precise
++	 * since imprecise watchpoints prevent us from calculating register
++	 * based addresses.
++	 *
++	 * For the time being, we only report 1 watchpoint register so we
++	 * always know which watchpoint fired. In the future we can either
++	 * add a disassembler and address generation emulator, or we can
++	 * insert a check to see if the DFAR is set on watchpoint exception
++	 * entry [the ARM ARM states that the DFAR is UNKNOWN, but
++	 * experience shows that it is set on some implementations].
++	 */
++
++#if 0
++	u32 didr, wrps;
++	ARM_DBG_READ(c0, 0, didr);
++	return ((didr >> 28) & 0xf) + 1;
++#endif
++
++	return 1;
++}
++
++int hw_breakpoint_slots(int type)
++{
++	/*
++	 * We can be called early, so don't rely on
++	 * our static variables being initialised.
++	 */
++	switch (type) {
++	case TYPE_INST:
++		return get_num_brps();
++	case TYPE_DATA:
++		return get_num_wrps();
++	default:
++		pr_warning("unknown slot type: %d\n", type);
++		return 0;
++	}
++}
++
++/* Determine debug architecture. */
++static u8 get_debug_arch(void)
++{
++	u32 didr;
++
++	/* Do we implement the extended CPUID interface? */
++	if (((read_cpuid_id() >> 16) & 0xf) != 0xf) {
++		pr_warning("CPUID feature registers not supported. "
++				"Assuming v6 debug is present.\n");
++		return ARM_DEBUG_ARCH_V6;
++	}
++
++	ARM_DBG_READ(c0, 0, didr);
++	return (didr >> 16) & 0xf;
++}
++
++/* Does this core support mismatch breakpoints? */
++static int core_has_mismatch_bps(void)
++{
++	return debug_arch >= ARM_DEBUG_ARCH_V7_ECP14 && core_num_brps > 1;
++}
++
++u8 arch_get_debug_arch(void)
++{
++	return debug_arch;
++}
++
++#define READ_WB_REG_CASE(OP2, M, VAL)		\
++	case ((OP2 << 4) + M):			\
++		ARM_DBG_READ(c ## M, OP2, VAL); \
++		break
++
++#define WRITE_WB_REG_CASE(OP2, M, VAL)		\
++	case ((OP2 << 4) + M):			\
++		ARM_DBG_WRITE(c ## M, OP2, VAL);\
++		break
++
++#define GEN_READ_WB_REG_CASES(OP2, VAL)		\
++	READ_WB_REG_CASE(OP2, 0, VAL);		\
++	READ_WB_REG_CASE(OP2, 1, VAL);		\
++	READ_WB_REG_CASE(OP2, 2, VAL);		\
++	READ_WB_REG_CASE(OP2, 3, VAL);		\
++	READ_WB_REG_CASE(OP2, 4, VAL);		\
++	READ_WB_REG_CASE(OP2, 5, VAL);		\
++	READ_WB_REG_CASE(OP2, 6, VAL);		\
++	READ_WB_REG_CASE(OP2, 7, VAL);		\
++	READ_WB_REG_CASE(OP2, 8, VAL);		\
++	READ_WB_REG_CASE(OP2, 9, VAL);		\
++	READ_WB_REG_CASE(OP2, 10, VAL);		\
++	READ_WB_REG_CASE(OP2, 11, VAL);		\
++	READ_WB_REG_CASE(OP2, 12, VAL);		\
++	READ_WB_REG_CASE(OP2, 13, VAL);		\
++	READ_WB_REG_CASE(OP2, 14, VAL);		\
++	READ_WB_REG_CASE(OP2, 15, VAL)
++
++#define GEN_WRITE_WB_REG_CASES(OP2, VAL)	\
++	WRITE_WB_REG_CASE(OP2, 0, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 1, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 2, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 3, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 4, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 5, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 6, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 7, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 8, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 9, VAL);		\
++	WRITE_WB_REG_CASE(OP2, 10, VAL);	\
++	WRITE_WB_REG_CASE(OP2, 11, VAL);	\
++	WRITE_WB_REG_CASE(OP2, 12, VAL);	\
++	WRITE_WB_REG_CASE(OP2, 13, VAL);	\
++	WRITE_WB_REG_CASE(OP2, 14, VAL);	\
++	WRITE_WB_REG_CASE(OP2, 15, VAL)
++
++static u32 read_wb_reg(int n)
++{
++	u32 val = 0;
++
++	switch (n) {
++	GEN_READ_WB_REG_CASES(ARM_OP2_BVR, val);
++	GEN_READ_WB_REG_CASES(ARM_OP2_BCR, val);
++	GEN_READ_WB_REG_CASES(ARM_OP2_WVR, val);
++	GEN_READ_WB_REG_CASES(ARM_OP2_WCR, val);
++	default:
++		pr_warning("attempt to read from unknown breakpoint "
++				"register %d\n", n);
++	}
++
++	return val;
++}
++
++static void write_wb_reg(int n, u32 val)
++{
++	switch (n) {
++	GEN_WRITE_WB_REG_CASES(ARM_OP2_BVR, val);
++	GEN_WRITE_WB_REG_CASES(ARM_OP2_BCR, val);
++	GEN_WRITE_WB_REG_CASES(ARM_OP2_WVR, val);
++	GEN_WRITE_WB_REG_CASES(ARM_OP2_WCR, val);
++	default:
++		pr_warning("attempt to write to unknown breakpoint "
++				"register %d\n", n);
++	}
++	isb();
++}
++
++/*
++ * In order to access the breakpoint/watchpoint control registers,
++ * we must be running in debug monitor mode. Unfortunately, we can
++ * be put into halting debug mode at any time by an external debugger
++ * but there is nothing we can do to prevent that.
++ */
++static int enable_monitor_mode(void)
++{
++	u32 dscr;
++	int ret = 0;
++
++	ARM_DBG_READ(c1, 0, dscr);
++
++	/* Ensure that halting mode is disabled. */
++	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN, "halting debug mode enabled."
++				"Unable to access hardware resources.")) {
++		ret = -EPERM;
++		goto out;
++	}
++
++	/* Write to the corresponding DSCR. */
++	switch (debug_arch) {
++	case ARM_DEBUG_ARCH_V6:
++	case ARM_DEBUG_ARCH_V6_1:
++		ARM_DBG_WRITE(c1, 0, (dscr | ARM_DSCR_MDBGEN));
++		break;
++	case ARM_DEBUG_ARCH_V7_ECP14:
++		ARM_DBG_WRITE(c2, 2, (dscr | ARM_DSCR_MDBGEN));
++		break;
++	default:
++		ret = -ENODEV;
++		goto out;
++	}
++
++	/* Check that the write made it through. */
++	ARM_DBG_READ(c1, 0, dscr);
++	if (WARN_ONCE(!(dscr & ARM_DSCR_MDBGEN),
++				"failed to enable monitor mode.")) {
++		ret = -EPERM;
++	}
++
++out:
++	return ret;
++}
++
++/*
++ * Check if 8-bit byte-address select is available.
++ * This clobbers WRP 0.
++ */
++static u8 get_max_wp_len(void)
++{
++	u32 ctrl_reg;
++	struct arch_hw_breakpoint_ctrl ctrl;
++	u8 size = 4;
++
++	if (debug_arch < ARM_DEBUG_ARCH_V7_ECP14)
++		goto out;
++
++	if (enable_monitor_mode())
++		goto out;
++
++	memset(&ctrl, 0, sizeof(ctrl));
++	ctrl.len = ARM_BREAKPOINT_LEN_8;
++	ctrl_reg = encode_ctrl_reg(ctrl);
++
++	write_wb_reg(ARM_BASE_WVR, 0);
++	write_wb_reg(ARM_BASE_WCR, ctrl_reg);
++	if ((read_wb_reg(ARM_BASE_WCR) & ctrl_reg) == ctrl_reg)
++		size = 8;
++
++out:
++	return size;
++}
++
++u8 arch_get_max_wp_len(void)
++{
++	return max_watchpoint_len;
++}
++
++/*
++ * Handler for reactivating a suspended watchpoint when the single
++ * step `mismatch' breakpoint is triggered.
++ */
++static void wp_single_step_handler(struct perf_event *bp, int unused,
++				   struct perf_sample_data *data,
++				   struct pt_regs *regs)
++{
++	perf_event_enable(counter_arch_bp(bp)->suspended_wp);
++	unregister_hw_breakpoint(bp);
++}
++
++static int bp_is_single_step(struct perf_event *bp)
++{
++	return bp->overflow_handler == wp_single_step_handler;
++}
++
++/*
++ * Install a perf counter breakpoint.
++ */
++int arch_install_hw_breakpoint(struct perf_event *bp)
++{
++	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
++	struct perf_event **slot, **slots;
++	int i, max_slots, ctrl_base, val_base, ret = 0;
++
++	/* Ensure that we are in monitor mode and halting mode is disabled. */
++	ret = enable_monitor_mode();
++	if (ret)
++		goto out;
++
++	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
++		/* Breakpoint */
++		ctrl_base = ARM_BASE_BCR;
++		val_base = ARM_BASE_BVR;
++		slots = __get_cpu_var(bp_on_reg);
++		max_slots = core_num_brps - 1;
++
++		if (bp_is_single_step(bp)) {
++			info->ctrl.mismatch = 1;
++			i = max_slots;
++			slots[i] = bp;
++			goto setup;
++		}
++	} else {
++		/* Watchpoint */
++		ctrl_base = ARM_BASE_WCR;
++		val_base = ARM_BASE_WVR;
++		slots = __get_cpu_var(wp_on_reg);
++		max_slots = core_num_wrps;
++	}
++
++	for (i = 0; i < max_slots; ++i) {
++		slot = &slots[i];
++
++		if (!*slot) {
++			*slot = bp;
++			break;
++		}
++	}
++
++	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot")) {
++		ret = -EBUSY;
++		goto out;
++	}
++
++setup:
++	/* Setup the address register. */
++	write_wb_reg(val_base + i, info->address);
++
++	/* Setup the control register. */
++	write_wb_reg(ctrl_base + i, encode_ctrl_reg(info->ctrl) | 0x1);
++
++out:
++	return ret;
++}
++
++void arch_uninstall_hw_breakpoint(struct perf_event *bp)
++{
++	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
++	struct perf_event **slot, **slots;
++	int i, max_slots, base;
++
++	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
++		/* Breakpoint */
++		base = ARM_BASE_BCR;
++		slots = __get_cpu_var(bp_on_reg);
++		max_slots = core_num_brps - 1;
++
++		if (bp_is_single_step(bp)) {
++			i = max_slots;
++			slots[i] = NULL;
++			goto reset;
++		}
++	} else {
++		/* Watchpoint */
++		base = ARM_BASE_WCR;
++		slots = __get_cpu_var(wp_on_reg);
++		max_slots = core_num_wrps;
++	}
++
++	/* Remove the breakpoint. */
++	for (i = 0; i < max_slots; ++i) {
++		slot = &slots[i];
++
++		if (*slot == bp) {
++			*slot = NULL;
++			break;
++		}
++	}
++
++	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot"))
++		return;
++
++reset:
++	/* Reset the control register. */
++	write_wb_reg(base + i, 0);
++}
++
++static int get_hbp_len(u8 hbp_len)
++{
++	unsigned int len_in_bytes = 0;
++
++	switch (hbp_len) {
++	case ARM_BREAKPOINT_LEN_1:
++		len_in_bytes = 1;
++		break;
++	case ARM_BREAKPOINT_LEN_2:
++		len_in_bytes = 2;
++		break;
++	case ARM_BREAKPOINT_LEN_4:
++		len_in_bytes = 4;
++		break;
++	case ARM_BREAKPOINT_LEN_8:
++		len_in_bytes = 8;
++		break;
++	}
++
++	return len_in_bytes;
++}
++
++/*
++ * Check whether bp virtual address is in kernel space.
++ */
++int arch_check_bp_in_kernelspace(struct perf_event *bp)
++{
++	unsigned int len;
++	unsigned long va;
++	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
++
++	va = info->address;
++	len = get_hbp_len(info->ctrl.len);
++
++	return (va >= TASK_SIZE) && ((va + len - 1) >= TASK_SIZE);
++}
++
++/*
++ * Extract generic type and length encodings from an arch_hw_breakpoint_ctrl.
++ * Hopefully this will disappear when ptrace can bypass the conversion
++ * to generic breakpoint descriptions.
++ */
++int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
++			   int *gen_len, int *gen_type)
++{
++	/* Type */
++	switch (ctrl.type) {
++	case ARM_BREAKPOINT_EXECUTE:
++		*gen_type = HW_BREAKPOINT_X;
++		break;
++	case ARM_BREAKPOINT_LOAD:
++		*gen_type = HW_BREAKPOINT_R;
++		break;
++	case ARM_BREAKPOINT_STORE:
++		*gen_type = HW_BREAKPOINT_W;
++		break;
++	case ARM_BREAKPOINT_LOAD | ARM_BREAKPOINT_STORE:
++		*gen_type = HW_BREAKPOINT_RW;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	/* Len */
++	switch (ctrl.len) {
++	case ARM_BREAKPOINT_LEN_1:
++		*gen_len = HW_BREAKPOINT_LEN_1;
++		break;
++	case ARM_BREAKPOINT_LEN_2:
++		*gen_len = HW_BREAKPOINT_LEN_2;
++		break;
++	case ARM_BREAKPOINT_LEN_4:
++		*gen_len = HW_BREAKPOINT_LEN_4;
++		break;
++	case ARM_BREAKPOINT_LEN_8:
++		*gen_len = HW_BREAKPOINT_LEN_8;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++/*
++ * Construct an arch_hw_breakpoint from a perf_event.
++ */
++static int arch_build_bp_info(struct perf_event *bp)
++{
++	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
++
++	/* Type */
++	switch (bp->attr.bp_type) {
++	case HW_BREAKPOINT_X:
++		info->ctrl.type = ARM_BREAKPOINT_EXECUTE;
++		break;
++	case HW_BREAKPOINT_R:
++		info->ctrl.type = ARM_BREAKPOINT_LOAD;
++		break;
++	case HW_BREAKPOINT_W:
++		info->ctrl.type = ARM_BREAKPOINT_STORE;
++		break;
++	case HW_BREAKPOINT_RW:
++		info->ctrl.type = ARM_BREAKPOINT_LOAD | ARM_BREAKPOINT_STORE;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	/* Len */
++	switch (bp->attr.bp_len) {
++	case HW_BREAKPOINT_LEN_1:
++		info->ctrl.len = ARM_BREAKPOINT_LEN_1;
++		break;
++	case HW_BREAKPOINT_LEN_2:
++		info->ctrl.len = ARM_BREAKPOINT_LEN_2;
++		break;
++	case HW_BREAKPOINT_LEN_4:
++		info->ctrl.len = ARM_BREAKPOINT_LEN_4;
++		break;
++	case HW_BREAKPOINT_LEN_8:
++		info->ctrl.len = ARM_BREAKPOINT_LEN_8;
++		if ((info->ctrl.type != ARM_BREAKPOINT_EXECUTE)
++			&& max_watchpoint_len >= 8)
++			break;
++	default:
++		return -EINVAL;
++	}
++
++	/* Address */
++	info->address = bp->attr.bp_addr;
++
++	/* Privilege */
++	info->ctrl.privilege = ARM_BREAKPOINT_USER;
++	if (arch_check_bp_in_kernelspace(bp) && !bp_is_single_step(bp))
++		info->ctrl.privilege |= ARM_BREAKPOINT_PRIV;
++
++	/* Enabled? */
++	info->ctrl.enabled = !bp->attr.disabled;
++
++	/* Mismatch */
++	info->ctrl.mismatch = 0;
++
++	return 0;
++}
++
++/*
++ * Validate the arch-specific HW Breakpoint register settings.
++ */
++int arch_validate_hwbkpt_settings(struct perf_event *bp)
++{
++	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
++	int ret = 0;
++	u32 bytelen, max_len, offset, alignment_mask = 0x3;
++
++	/* Build the arch_hw_breakpoint. */
++	ret = arch_build_bp_info(bp);
++	if (ret)
++		goto out;
++
++	/* Check address alignment. */
++	if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
++		alignment_mask = 0x7;
++	if (info->address & alignment_mask) {
++		/*
++		 * Try to fix the alignment. This may result in a length
++		 * that is too large, so we must check for that.
++		 */
++		bytelen = get_hbp_len(info->ctrl.len);
++		max_len = info->ctrl.type == ARM_BREAKPOINT_EXECUTE ? 4 :
++				max_watchpoint_len;
++
++		if (max_len >= 8)
++			offset = info->address & 0x7;
++		else
++			offset = info->address & 0x3;
++
++		if (bytelen > (1 << ((max_len - (offset + 1)) >> 1))) {
++			ret = -EFBIG;
++			goto out;
++		}
++
++		info->ctrl.len <<= offset;
++		info->address &= ~offset;
++
++		pr_debug("breakpoint alignment fixup: length = 0x%x, "
++			"address = 0x%x\n", info->ctrl.len, info->address);
++	}
++
++	/*
++	 * Currently we rely on an overflow handler to take
++	 * care of single-stepping the breakpoint when it fires.
++	 * In the case of userspace breakpoints on a core with V7 debug,
++	 * we can use the mismatch feature as a poor-man's hardware single-step.
++	 */
++	if (WARN_ONCE(!bp->overflow_handler &&
++		(arch_check_bp_in_kernelspace(bp) || !core_has_mismatch_bps()),
++			"overflow handler required but none found")) {
++		ret = -EINVAL;
++		goto out;
++	}
++out:
++	return ret;
++}
++
++static void update_mismatch_flag(int idx, int flag)
++{
++	struct perf_event *bp = __get_cpu_var(bp_on_reg[idx]);
++	struct arch_hw_breakpoint *info;
++
++	if (bp == NULL)
++		return;
++
++	info = counter_arch_bp(bp);
++
++	/* Update the mismatch field to enter/exit `single-step' mode */
++	if (!bp->overflow_handler && info->ctrl.mismatch != flag) {
++		info->ctrl.mismatch = flag;
++		write_wb_reg(ARM_BASE_BCR + idx, encode_ctrl_reg(info->ctrl) | 0x1);
++	}
++}
++
++static void watchpoint_handler(unsigned long unknown, struct pt_regs *regs)
++{
++	int i;
++	struct perf_event *bp, **slots = __get_cpu_var(wp_on_reg);
++	struct arch_hw_breakpoint *info;
++	struct perf_event_attr attr;
++
++	/* Without a disassembler, we can only handle 1 watchpoint. */
++	BUG_ON(core_num_wrps > 1);
++
++	hw_breakpoint_init(&attr);
++	attr.bp_addr	= regs->ARM_pc & ~0x3;
++	attr.bp_len	= HW_BREAKPOINT_LEN_4;
++	attr.bp_type	= HW_BREAKPOINT_X;
++
++	for (i = 0; i < core_num_wrps; ++i) {
++		rcu_read_lock();
++
++		if (slots[i] == NULL) {
++			rcu_read_unlock();
++			continue;
++		}
++
++		/*
++		 * The DFAR is an unknown value. Since we only allow a
++		 * single watchpoint, we can set the trigger to the lowest
++		 * possible faulting address.
++		 */
++		info = counter_arch_bp(slots[i]);
++		info->trigger = slots[i]->attr.bp_addr;
++		pr_debug("watchpoint fired: address = 0x%x\n", info->trigger);
++		perf_bp_event(slots[i], regs);
++
++		/*
++		 * If no overflow handler is present, insert a temporary
++		 * mismatch breakpoint so we can single-step over the
++		 * watchpoint trigger.
++		 */
++		if (!slots[i]->overflow_handler) {
++			bp = register_user_hw_breakpoint(&attr,
++							 wp_single_step_handler,
++							 current);
++			counter_arch_bp(bp)->suspended_wp = slots[i];
++			perf_event_disable(slots[i]);
++		}
++
++		rcu_read_unlock();
++	}
++}
++
++static void breakpoint_handler(unsigned long unknown, struct pt_regs *regs)
++{
++	int i;
++	int mismatch;
++	u32 ctrl_reg, val, addr;
++	struct perf_event *bp, **slots = __get_cpu_var(bp_on_reg);
++	struct arch_hw_breakpoint *info;
++	struct arch_hw_breakpoint_ctrl ctrl;
++
++	/* The exception entry code places the amended lr in the PC. */
++	addr = regs->ARM_pc;
++
++	for (i = 0; i < core_num_brps; ++i) {
++		rcu_read_lock();
++
++		bp = slots[i];
++
++		if (bp == NULL) {
++			rcu_read_unlock();
++			continue;
++		}
++
++		mismatch = 0;
++
++		/* Check if the breakpoint value matches. */
++		val = read_wb_reg(ARM_BASE_BVR + i);
++		if (val != (addr & ~0x3))
++			goto unlock;
++
++		/* Possible match, check the byte address select to confirm. */
++		ctrl_reg = read_wb_reg(ARM_BASE_BCR + i);
++		decode_ctrl_reg(ctrl_reg, &ctrl);
++		if ((1 << (addr & 0x3)) & ctrl.len) {
++			mismatch = 1;
++			info = counter_arch_bp(bp);
++			info->trigger = addr;
++		}
++
++unlock:
++		if ((mismatch && !info->ctrl.mismatch) || bp_is_single_step(bp)) {
++			pr_debug("breakpoint fired: address = 0x%x\n", addr);
++			perf_bp_event(bp, regs);
++		}
++
++		update_mismatch_flag(i, mismatch);
++		rcu_read_unlock();
++	}
++}
++
++/*
++ * Called from either the Data Abort Handler [watchpoint] or the
++ * Prefetch Abort Handler [breakpoint].
++ */
++static int hw_breakpoint_pending(unsigned long addr, unsigned int fsr,
++				 struct pt_regs *regs)
++{
++	int ret = 1; /* Unhandled fault. */
++	u32 dscr;
++
++	/* We only handle watchpoints and hardware breakpoints. */
++	ARM_DBG_READ(c1, 0, dscr);
++
++	/* Perform perf callbacks. */
++	switch (ARM_DSCR_MOE(dscr)) {
++	case ARM_ENTRY_BREAKPOINT:
++		breakpoint_handler(addr, regs);
++		break;
++	case ARM_ENTRY_ASYNC_WATCHPOINT:
++		WARN_ON("Asynchronous watchpoint exception taken. "
++			"Debugging results may be unreliable");
++	case ARM_ENTRY_SYNC_WATCHPOINT:
++		watchpoint_handler(addr, regs);
++		break;
++	default:
++		goto out;
++	}
++
++	ret = 0;
++out:
++	return ret;
++}
++
++/*
++ * One-time initialisation.
++ */
++static void __init reset_ctrl_regs(void *unused)
++{
++	int i;
++
++	if (enable_monitor_mode())
++		return;
++
++	for (i = 0; i < core_num_brps; ++i) {
++		write_wb_reg(ARM_BASE_BCR + i, 0UL);
++		write_wb_reg(ARM_BASE_BVR + i, 0UL);
++	}
++
++	for (i = 0; i < core_num_wrps; ++i) {
++		write_wb_reg(ARM_BASE_WCR + i, 0UL);
++		write_wb_reg(ARM_BASE_WVR + i, 0UL);
++	}
++}
++
++static int __init arch_hw_breakpoint_init(void)
++{
++	int ret = 0;
++	u32 dscr;
++
++	debug_arch = get_debug_arch();
++
++	if (debug_arch > ARM_DEBUG_ARCH_V7_ECP14) {
++		pr_info("debug architecture 0x%x unsupported.\n", debug_arch);
++		ret = -ENODEV;
++		goto out;
++	}
++
++	/* Determine how many BRPs/WRPs are available. */
++	core_num_brps = get_num_brps();
++	core_num_wrps = get_num_wrps();
++
++	pr_info("found %d breakpoint and %d watchpoint registers.\n",
++			core_num_brps, core_num_wrps);
++
++	if (core_has_mismatch_bps())
++		pr_info("1 breakpoint reserved for watchpoint single-step.\n");
++
++	ARM_DBG_READ(c1, 0, dscr);
++	if (dscr & ARM_DSCR_HDBGEN) {
++		pr_warning("halting debug mode enabled. Assuming maximum "
++				"watchpoint size of 4 bytes.");
++	} else {
++		/* Work out the maximum supported watchpoint length. */
++		max_watchpoint_len = get_max_wp_len();
++		pr_info("maximum watchpoint size is %u bytes.\n",
++				max_watchpoint_len);
++
++		/*
++		 * Reset the breakpoint resources. We assume that a halting
++		 * debugger will leave the world in a nice state for us.
++		 */
++		smp_call_function(reset_ctrl_regs, NULL, 1);
++		reset_ctrl_regs(NULL);
++	}
++
++	/* Register debug fault handler. */
++	hook_fault_code(2, hw_breakpoint_pending, SIGTRAP, TRAP_HWBKPT,
++			"watchpoint debug exception");
++	hook_ifault_code(2, hw_breakpoint_pending, SIGTRAP, TRAP_HWBKPT,
++			"breakpoint debug exception");
++
++out:
++	return ret;
++}
++arch_initcall(arch_hw_breakpoint_init);
++
++void hw_breakpoint_pmu_read(struct perf_event *bp)
++{
++}
++
++/*
++ * Dummy function to register with die_notifier.
++ */
++int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
++					unsigned long val, void *data)
++{
++	return NOTIFY_DONE;
++}
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/Makefile linux-arm/arch/arm/kernel/Makefile
+--- linux-2.6.36/arch/arm/kernel/Makefile	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/Makefile	2011-02-07 13:36:02.000000000 +0530
+@@ -42,6 +42,8 @@
+ obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
+ obj-$(CONFIG_HAVE_TCM)		+= tcm.o
+ obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
++obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
++obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+ 
+ obj-$(CONFIG_CRUNCH)		+= crunch.o crunch-bits.o
+ AFLAGS_crunch-bits.o		:= -Wa,-mcpu=ep9312
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/perf_event.c linux-arm/arch/arm/kernel/perf_event.c
+--- linux-2.6.36/arch/arm/kernel/perf_event.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/perf_event.c	2011-02-07 13:36:02.000000000 +0530
+@@ -1702,7 +1702,7 @@
+ static inline int armv7_pmnc_counter_has_overflowed(unsigned long pmnc,
+ 					enum armv7_counters counter)
+ {
+-	int ret;
++	int ret = 0;
+ 
+ 	if (counter == ARMV7_CYCLE_COUNTER)
+ 		ret = pmnc & ARMV7_FLAG_C;
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/process.c linux-arm/arch/arm/kernel/process.c
+--- linux-2.6.36/arch/arm/kernel/process.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/process.c	2011-02-07 13:36:02.000000000 +0530
+@@ -29,6 +29,7 @@
+ #include <linux/utsname.h>
+ #include <linux/uaccess.h>
+ #include <linux/random.h>
++#include <linux/hw_breakpoint.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/leds.h>
+@@ -317,6 +318,8 @@
+ 	struct thread_info *thread = current_thread_info();
+ 	struct task_struct *tsk = current;
+ 
++	flush_ptrace_hw_breakpoint(tsk);
++
+ 	memset(thread->used_cp, 0, sizeof(thread->used_cp));
+ 	memset(&tsk->thread.debug, 0, sizeof(struct debug_info));
+ 	memset(&thread->fpstate, 0, sizeof(union fp_state));
+@@ -345,6 +348,8 @@
+ 	thread->cpu_context.sp = (unsigned long)childregs;
+ 	thread->cpu_context.pc = (unsigned long)ret_from_fork;
+ 
++	clear_ptrace_hw_breakpoint(p);
++
+ 	if (clone_flags & CLONE_SETTLS)
+ 		thread->tp_value = regs->ARM_r3;
+ 
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/ptrace.c linux-arm/arch/arm/kernel/ptrace.c
+--- linux-2.6.36/arch/arm/kernel/ptrace.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/ptrace.c	2011-02-07 13:36:02.000000000 +0530
+@@ -19,6 +19,8 @@
+ #include <linux/init.h>
+ #include <linux/signal.h>
+ #include <linux/uaccess.h>
++#include <linux/perf_event.h>
++#include <linux/hw_breakpoint.h>
+ 
+ #include <asm/pgtable.h>
+ #include <asm/system.h>
+@@ -847,6 +849,232 @@
+ }
+ #endif
+ 
++#ifdef CONFIG_HAVE_HW_BREAKPOINT
++/*
++ * Convert a virtual register number into an index for a thread_info
++ * breakpoint array. Breakpoints are identified using positive numbers
++ * whilst watchpoints are negative. The registers are laid out as pairs
++ * of (address, control), each pair mapping to a unique hw_breakpoint struct.
++ * Register 0 is reserved for describing resource information.
++ */
++static int ptrace_hbp_num_to_idx(long num)
++{
++	if (num < 0)
++		num = (ARM_MAX_BRP << 1) - num;
++	return (num - 1) >> 1;
++}
++
++/*
++ * Returns the virtual register number for the address of the
++ * breakpoint at index idx.
++ */
++static long ptrace_hbp_idx_to_num(int idx)
++{
++	long mid = ARM_MAX_BRP << 1;
++	long num = (idx << 1) + 1;
++	return num > mid ? mid - num : num;
++}
++
++/*
++ * Handle hitting a HW-breakpoint.
++ */
++static void ptrace_hbptriggered(struct perf_event *bp, int unused,
++				     struct perf_sample_data *data,
++				     struct pt_regs *regs)
++{
++	struct arch_hw_breakpoint *bkpt = counter_arch_bp(bp);
++	long num;
++	int i;
++	siginfo_t info;
++
++	for (i = 0; i < ARM_MAX_HBP_SLOTS; ++i)
++		if (current->thread.debug.hbp[i] == bp)
++			break;
++
++	num = (i == ARM_MAX_HBP_SLOTS) ? 0 : ptrace_hbp_idx_to_num(i);
++
++	info.si_signo	= SIGTRAP;
++	info.si_errno	= (int)num;
++	info.si_code	= TRAP_HWBKPT;
++	info.si_addr	= (void __user *)(bkpt->trigger);
++
++	force_sig_info(SIGTRAP, &info, current);
++}
++
++/*
++ * Set ptrace breakpoint pointers to zero for this task.
++ * This is required in order to prevent child processes from unregistering
++ * breakpoints held by their parent.
++ */
++void clear_ptrace_hw_breakpoint(struct task_struct *tsk)
++{
++	memset(tsk->thread.debug.hbp, 0, sizeof(tsk->thread.debug.hbp));
++}
++
++/*
++ * Unregister breakpoints from this task and reset the pointers in
++ * the thread_struct.
++ */
++void flush_ptrace_hw_breakpoint(struct task_struct *tsk)
++{
++	int i;
++	struct thread_struct *t = &tsk->thread;
++
++	for (i = 0; i < ARM_MAX_HBP_SLOTS; i++) {
++		if (t->debug.hbp[i]) {
++			unregister_hw_breakpoint(t->debug.hbp[i]);
++			t->debug.hbp[i] = NULL;
++		}
++	}
++}
++
++static u32 ptrace_get_hbp_resource_info(void)
++{
++	u8 num_brps, num_wrps, debug_arch, wp_len;
++	u32 reg = 0;
++
++	num_brps	= hw_breakpoint_slots(TYPE_INST);
++	num_wrps	= hw_breakpoint_slots(TYPE_DATA);
++	debug_arch	= arch_get_debug_arch();
++	wp_len		= arch_get_max_wp_len();
++
++	reg		|= debug_arch;
++	reg		<<= 8;
++	reg		|= wp_len;
++	reg		<<= 8;
++	reg		|= num_wrps;
++	reg		<<= 8;
++	reg		|= num_brps;
++
++	return reg;
++}
++
++static struct perf_event *ptrace_hbp_create(struct task_struct *tsk, int type)
++{
++	struct perf_event_attr attr;
++
++	ptrace_breakpoint_init(&attr);
++
++	/* Initialise fields to sane defaults. */
++	attr.bp_addr	= 0;
++	attr.bp_len	= HW_BREAKPOINT_LEN_4;
++	attr.bp_type	= type;
++	attr.disabled	= 1;
++
++	return register_user_hw_breakpoint(&attr, ptrace_hbptriggered, tsk);
++}
++
++static int ptrace_gethbpregs(struct task_struct *tsk, long num,
++			     unsigned long  __user *data)
++{
++	u32 reg;
++	int idx, ret = 0;
++	struct perf_event *bp;
++	struct arch_hw_breakpoint_ctrl arch_ctrl;
++
++	if (num == 0) {
++		reg = ptrace_get_hbp_resource_info();
++	} else {
++		idx = ptrace_hbp_num_to_idx(num);
++		if (idx < 0 || idx >= ARM_MAX_HBP_SLOTS) {
++			ret = -EINVAL;
++			goto out;
++		}
++
++		bp = tsk->thread.debug.hbp[idx];
++		if (!bp) {
++			reg = 0;
++			goto put;
++		}
++
++		arch_ctrl = counter_arch_bp(bp)->ctrl;
++
++		/*
++		 * Fix up the len because we may have adjusted it
++		 * to compensate for an unaligned address.
++		 */
++		while (!(arch_ctrl.len & 0x1))
++			arch_ctrl.len >>= 1;
++
++		if (idx & 0x1)
++			reg = encode_ctrl_reg(arch_ctrl);
++		else
++			reg = bp->attr.bp_addr;
++	}
++
++put:
++	if (put_user(reg, data))
++		ret = -EFAULT;
++
++out:
++	return ret;
++}
++
++static int ptrace_sethbpregs(struct task_struct *tsk, long num,
++			     unsigned long __user *data)
++{
++	int idx, gen_len, gen_type, implied_type, ret = 0;
++	u32 user_val;
++	struct perf_event *bp;
++	struct arch_hw_breakpoint_ctrl ctrl;
++	struct perf_event_attr attr;
++
++	if (num == 0)
++		goto out;
++	else if (num < 0)
++		implied_type = HW_BREAKPOINT_RW;
++	else
++		implied_type = HW_BREAKPOINT_X;
++
++	idx = ptrace_hbp_num_to_idx(num);
++	if (idx < 0 || idx >= ARM_MAX_HBP_SLOTS) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	if (get_user(user_val, data)) {
++		ret = -EFAULT;
++		goto out;
++	}
++
++	bp = tsk->thread.debug.hbp[idx];
++	if (!bp) {
++		bp = ptrace_hbp_create(tsk, implied_type);
++		if (IS_ERR(bp)) {
++			ret = PTR_ERR(bp);
++			goto out;
++		}
++		tsk->thread.debug.hbp[idx] = bp;
++	}
++
++	attr = bp->attr;
++
++	if (num & 0x1) {
++		/* Address */
++		attr.bp_addr	= user_val;
++	} else {
++		/* Control */
++		decode_ctrl_reg(user_val, &ctrl);
++		ret = arch_bp_generic_fields(ctrl, &gen_len, &gen_type);
++		if (ret)
++			goto out;
++
++		if ((gen_type & implied_type) != gen_type) {
++				ret = -EINVAL;
++				goto out;
++		}
++
++		attr.bp_len	= gen_len;
++		attr.bp_type	= gen_type;
++		attr.disabled	= !ctrl.enabled;
++	}
++
++	ret = modify_user_hw_breakpoint(bp, &attr);
++out:
++	return ret;
++}
++#endif
++
+ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
+ {
+ 	int ret;
+@@ -916,6 +1144,17 @@
+ 			break;
+ #endif
+ 
++#ifdef CONFIG_HAVE_HW_BREAKPOINT
++		case PTRACE_GETHBPREGS:
++			ret = ptrace_gethbpregs(child, addr,
++						(unsigned long __user *)data);
++			break;
++		case PTRACE_SETHBPREGS:
++			ret = ptrace_sethbpregs(child, addr,
++						(unsigned long __user *)data);
++			break;
++#endif
++
+ 		default:
+ 			ret = ptrace_request(child, request, addr, data);
+ 			break;
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/setup.c linux-arm/arch/arm/kernel/setup.c
+--- linux-2.6.36/arch/arm/kernel/setup.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/setup.c	2011-02-07 13:36:02.000000000 +0530
+@@ -224,8 +224,8 @@
+ 		 * Register 0 and check for VMSAv7 or PMSAv7 */
+ 		asm("mrc	p15, 0, %0, c0, c1, 4"
+ 		    : "=r" (mmfr0));
+-		if ((mmfr0 & 0x0000000f) == 0x00000003 ||
+-		    (mmfr0 & 0x000000f0) == 0x00000030)
++		if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
++		    (mmfr0 & 0x000000f0) >= 0x00000030)
+ 			cpu_arch = CPU_ARCH_ARMv7;
+ 		else if ((mmfr0 & 0x0000000f) == 0x00000002 ||
+ 			 (mmfr0 & 0x000000f0) == 0x00000020)
+@@ -238,6 +238,35 @@
+ 	return cpu_arch;
+ }
+ 
++static int cpu_has_aliasing_icache(unsigned int arch)
++{
++	int aliasing_icache;
++	unsigned int id_reg, num_sets, line_size;
++
++	/* arch specifies the register format */
++	switch (arch) {
++	case CPU_ARCH_ARMv7:
++		asm("mcr	p15, 2, %0, c0, c0, 0 @ set CSSELR"
++		    : /* No output operands */
++		    : "r" (1));
++		isb();
++		asm("mrc	p15, 1, %0, c0, c0, 0 @ read CCSIDR"
++		    : "=r" (id_reg));
++		line_size = 4 << ((id_reg & 0x7) + 2);
++		num_sets = ((id_reg >> 13) & 0x7fff) + 1;
++		aliasing_icache = (line_size * num_sets) > PAGE_SIZE;
++		break;
++	case CPU_ARCH_ARMv6:
++		aliasing_icache = read_cpuid_cachetype() & (1 << 11);
++		break;
++	default:
++		/* I-cache aliases will be handled by D-cache aliasing code */
++		aliasing_icache = 0;
++	}
++
++	return aliasing_icache;
++}
++
+ static void __init cacheid_init(void)
+ {
+ 	unsigned int cachetype = read_cpuid_cachetype();
+@@ -249,10 +278,15 @@
+ 			cacheid = CACHEID_VIPT_NONALIASING;
+ 			if ((cachetype & (3 << 14)) == 1 << 14)
+ 				cacheid |= CACHEID_ASID_TAGGED;
+-		} else if (cachetype & (1 << 23))
++			else if (cpu_has_aliasing_icache(CPU_ARCH_ARMv7))
++				cacheid |= CACHEID_VIPT_I_ALIASING;
++		} else if (cachetype & (1 << 23)) {
+ 			cacheid = CACHEID_VIPT_ALIASING;
+-		else
++		} else {
+ 			cacheid = CACHEID_VIPT_NONALIASING;
++			if (cpu_has_aliasing_icache(CPU_ARCH_ARMv6))
++				cacheid |= CACHEID_VIPT_I_ALIASING;
++		}
+ 	} else {
+ 		cacheid = CACHEID_VIVT;
+ 	}
+@@ -263,7 +297,7 @@
+ 		cache_is_vipt_nonaliasing() ? "VIPT nonaliasing" : "unknown",
+ 		cache_is_vivt() ? "VIVT" :
+ 		icache_is_vivt_asid_tagged() ? "VIVT ASID tagged" :
+-		cache_is_vipt_aliasing() ? "VIPT aliasing" :
++		icache_is_vipt_aliasing() ? "VIPT aliasing" :
+ 		cache_is_vipt_nonaliasing() ? "VIPT nonaliasing" : "unknown");
+ }
+ 
+@@ -324,8 +358,10 @@
+ 	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
+ 	       proc_arch[cpu_architecture()], cr_alignment);
+ 
+-	sprintf(init_utsname()->machine, "%s%c", list->arch_name, ENDIANNESS);
+-	sprintf(elf_platform, "%s%c", list->elf_name, ENDIANNESS);
++	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
++		 list->arch_name, ENDIANNESS);
++	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
++		 list->elf_name, ENDIANNESS);
+ 	elf_hwcap = list->elf_hwcap;
+ #ifndef CONFIG_ARM_THUMB
+ 	elf_hwcap &= ~HWCAP_THUMB;
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/stacktrace.c linux-arm/arch/arm/kernel/stacktrace.c
+--- linux-2.6.36/arch/arm/kernel/stacktrace.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/stacktrace.c	2011-02-07 13:36:02.000000000 +0530
+@@ -28,7 +28,7 @@
+ 
+ 	/* only go to a higher address on the stack */
+ 	low = frame->sp;
+-	high = ALIGN(low, THREAD_SIZE) + THREAD_SIZE;
++	high = ALIGN(low, THREAD_SIZE);
+ 
+ 	/* check current frame pointer is within bounds */
+ 	if (fp < (low + 12) || fp + 4 >= high)
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/swp_emulate.c linux-arm/arch/arm/kernel/swp_emulate.c
+--- linux-2.6.36/arch/arm/kernel/swp_emulate.c	1970-01-01 05:30:00.000000000 +0530
++++ linux-arm/arch/arm/kernel/swp_emulate.c	2011-02-07 13:36:02.000000000 +0530
+@@ -0,0 +1,263 @@
++/*
++ *  linux/arch/arm/kernel/swp_emulate.c
++ *
++ *  Copyright (C) 2009 ARM Limited
++ *  __user_* functions adapted from include/asm/uaccess.h
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ *  Implements emulation of the SWP/SWPB instructions using load-exclusive and
++ *  store-exclusive for processors that have them disabled (or future ones that
++ *  might not implement them).
++ *
++ *  Syntax of SWP{B} instruction: SWP{B}<c> <Rt>, <Rt2>, [<Rn>]
++ *  Where: Rt  = destination
++ *	   Rt2 = source
++ *	   Rn  = address
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/proc_fs.h>
++#include <linux/sched.h>
++#include <linux/syscalls.h>
++#include <linux/perf_event.h>
++
++#include <asm/traps.h>
++#include <asm/uaccess.h>
++
++/*
++ * Error-checking SWP macros implemented using ldrex{b}/strex{b}
++ */
++#define __user_swpX_asm(data, addr, res, B)			\
++	__asm__ __volatile__(					\
++	"	mov		r3, %1\n"			\
++	"0:	ldrex"B"	%1, [%2]\n"			\
++	"1:	strex"B"	%0, r3, [%2]\n"			\
++	"	cmp		%0, #0\n"			\
++	"	movne		%0, %3\n"			\
++	"2:\n"							\
++	"	.section	 .fixup,\"ax\"\n"		\
++	"	.align		2\n"				\
++	"3:	mov		%0, %4\n"			\
++	"	b		2b\n"				\
++	"	.previous\n"					\
++	"	.section	 __ex_table,\"a\"\n"		\
++	"	.align		3\n"				\
++	"	.long		0b, 3b\n"			\
++	"	.long		1b, 3b\n"			\
++	"	.previous"					\
++	: "=&r" (res), "+r" (data)				\
++	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
++	: "cc", "r3")
++
++#define __user_swp_asm(data, addr, res) __user_swpX_asm(data, addr, res, "")
++#define __user_swpb_asm(data, addr, res) __user_swpX_asm(data, addr, res, "b")
++
++/*
++ * Macros/defines for extracting register numbers from instruction.
++ */
++#define EXTRACT_REG_NUM(instruction, offset) \
++  (((instruction) & (0xf << (offset))) >> (offset))
++#define RN_OFFSET  16
++#define RT_OFFSET  12
++#define RT2_OFFSET  0
++/*
++ * Bit 22 of the instruction encoding distinguishes between
++ * the SWP and SWPB variants (bit set means SWPB).
++ */
++#define TYPE_SWPB (1 << 22)
++
++static unsigned long long swpcounter;
++static unsigned long long swpbcounter;
++static unsigned long long abtcounter;
++static long		  previous_pid;
++
++#ifdef CONFIG_PROC_FS
++static int proc_read_status(char *page, char **start, off_t off, int count,
++			    int *eof, void *data)
++{
++	char *p = page;
++	int len;
++
++	p += sprintf(p, "Emulated SWP:\t\t%llu\n", swpcounter);
++	p += sprintf(p, "Emulated SWPB:\t\t%llu\n", swpbcounter);
++	p += sprintf(p, "Aborted SWP{B}:\t\t%llu\n", abtcounter);
++	if (previous_pid != 0)
++		p += sprintf(p, "Last process:\t\t%ld\n", previous_pid);
++
++	len = (p - page) - off;
++	if (len < 0)
++		len = 0;
++
++	*eof = (len <= count) ? 1 : 0;
++	*start = page + off;
++
++	return len;
++}
++#endif
++
++/*
++ * Set up process info to signal segmentation fault - called on access error.
++ */
++static void set_segfault(struct pt_regs *regs, unsigned long addr)
++{
++	siginfo_t info;
++
++	if (find_vma(current->mm, addr) == NULL)
++		info.si_code = SEGV_MAPERR;
++	else
++		info.si_code = SEGV_ACCERR;
++
++	info.si_signo = SIGSEGV;
++	info.si_errno = 0;
++	info.si_addr  = (void *) instruction_pointer(regs);
++
++	pr_debug("SWP{B} emulation: access caused memory abort!\n");
++	arm_notify_die("Illegal memory access", regs, &info, 0, 0);
++
++	abtcounter++;
++}
++
++static int emulate_swpX(unsigned int address, unsigned int *data,
++			unsigned int type)
++{
++	unsigned int res = 0;
++
++	if ((type != TYPE_SWPB) && (address & 0x3)) {
++		/* SWP to unaligned address not permitted */
++		pr_debug("SWP instruction on unaligned pointer!\n");
++		return -EFAULT;
++	}
++
++	while (1) {
++		/*
++		 * Barrier required between accessing protected resource and
++		 * releasing a lock for it. Legacy code might not have done
++		 * this, and we cannot determine that this is not the case
++		 * being emulated, so insert always.
++		 */
++		smp_mb();
++
++		if (type == TYPE_SWPB)
++			__user_swpb_asm(*data, address, res);
++		else
++			__user_swp_asm(*data, address, res);
++
++		if (likely(res != -EAGAIN) || signal_pending(current))
++			break;
++
++		cond_resched();
++	}
++
++	if (res == 0) {
++		/*
++		 * Barrier also required between aquiring a lock for a
++		 * protected resource and accessing the resource. Inserted for
++		 * same reason as above.
++		 */
++		smp_mb();
++
++		if (type == TYPE_SWPB)
++			swpbcounter++;
++		else
++			swpcounter++;
++	}
++
++	return res;
++}
++
++/*
++ * swp_handler logs the id of calling process, dissects the instruction, sanity
++ * checks the memory location, calls emulate_swpX for the actual operation and
++ * deals with fixup/error handling before returning
++ */
++static int swp_handler(struct pt_regs *regs, unsigned int instr)
++{
++	unsigned int address, destreg, data, type;
++	unsigned int res = 0;
++
++       perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, 0, regs, regs->ARM_pc);
++
++	if (current->pid != previous_pid) {
++		pr_debug("\"%s\" (%ld) uses deprecated SWP{B} instruction\n",
++			 current->comm, (unsigned long)current->pid);
++		previous_pid = current->pid;
++	}
++
++	address = regs->uregs[EXTRACT_REG_NUM(instr, RN_OFFSET)];
++	data	= regs->uregs[EXTRACT_REG_NUM(instr, RT2_OFFSET)];
++	destreg = EXTRACT_REG_NUM(instr, RT_OFFSET);
++
++	type = instr & TYPE_SWPB;
++
++	pr_debug("addr in r%d->0x%08x, dest is r%d, source in r%d->0x%08x)\n",
++		 EXTRACT_REG_NUM(instr, RN_OFFSET), address,
++		 destreg, EXTRACT_REG_NUM(instr, RT2_OFFSET), data);
++
++	/* Check access in reasonable access range for both SWP and SWPB */
++	if (!access_ok(VERIFY_WRITE, (address & ~3), 4)) {
++		pr_debug("SWP{B} emulation: access to %p not allowed!\n",
++			 (void *)address);
++		res = -EFAULT;
++	} else {
++		res = emulate_swpX(address, &data, type);
++	}
++
++	if (res == 0) {
++		/*
++		 * On successful emulation, revert the adjustment to the PC
++		 * made in kernel/traps.c in order to resume execution at the
++		 * instruction following the SWP{B}.
++		 */
++		regs->ARM_pc += 4;
++		regs->uregs[destreg] = data;
++	} else if (res == -EFAULT) {
++		/*
++		 * Memory errors do not mean emulation failed.
++		 * Set up signal info to return SEGV, then return OK
++		 */
++		set_segfault(regs, address);
++	}
++
++	return 0;
++}
++
++/*
++ * Only emulate SWP/SWPB executed in ARM state/User mode.
++ * The kernel must be SWP free and SWP{B} does not exist in Thumb/ThumbEE.
++ */
++static struct undef_hook swp_hook = {
++	.instr_mask = 0x0fb00ff0,
++	.instr_val  = 0x01000090,
++	.cpsr_mask  = MODE_MASK | PSR_T_BIT | PSR_J_BIT,
++	.cpsr_val   = USR_MODE,
++	.fn	    = swp_handler
++};
++
++/*
++ * Register handler and create status file in /proc/cpu
++ * Invoked as late_initcall, since not needed before init spawned.
++ */
++static int __init swp_emulation_init(void)
++{
++#ifdef CONFIG_PROC_FS
++	struct proc_dir_entry *res;
++
++	res = create_proc_entry("cpu/swp_emulation", S_IRUGO, NULL);
++
++	if (!res)
++		return -ENOMEM;
++
++	res->read_proc = proc_read_status;
++#endif /* CONFIG_PROC_FS */
++
++	printk(KERN_NOTICE "Registering SWP/SWPB emulation handler\n");
++	register_undef_hook(&swp_hook);
++
++	return 0;
++}
++
++late_initcall(swp_emulation_init);
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/traps.c linux-arm/arch/arm/kernel/traps.c
+--- linux-2.6.36/arch/arm/kernel/traps.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/traps.c	2011-02-07 13:36:02.000000000 +0530
+@@ -37,6 +37,8 @@
+ 
+ static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
+ 
++void *vectors_page;
++
+ #ifdef CONFIG_DEBUG_USER
+ unsigned int user_debug;
+ 
+@@ -759,7 +761,11 @@
+ 
+ void __init early_trap_init(void)
+ {
++#if defined(CONFIG_CPU_USE_DOMAINS)
+ 	unsigned long vectors = CONFIG_VECTORS_BASE;
++#else
++	unsigned long vectors = (unsigned long)vectors_page;
++#endif
+ 	extern char __stubs_start[], __stubs_end[];
+ 	extern char __vectors_start[], __vectors_end[];
+ 	extern char __kuser_helper_start[], __kuser_helper_end[];
+@@ -783,10 +789,10 @@
+ 	 * Copy signal return handlers into the vector page, and
+ 	 * set sigreturn to be a pointer to these.
+ 	 */
+-	memcpy((void *)KERN_SIGRETURN_CODE, sigreturn_codes,
+-	       sizeof(sigreturn_codes));
+-	memcpy((void *)KERN_RESTART_CODE, syscall_restart_code,
+-	       sizeof(syscall_restart_code));
++	memcpy((void *)(vectors + KERN_SIGRETURN_CODE - CONFIG_VECTORS_BASE),
++	       sigreturn_codes, sizeof(sigreturn_codes));
++	memcpy((void *)(vectors + KERN_RESTART_CODE - CONFIG_VECTORS_BASE),
++	       syscall_restart_code, sizeof(syscall_restart_code));
+ 
+ 	flush_icache_range(vectors, vectors + PAGE_SIZE);
+ 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/kernel/unwind.c linux-arm/arch/arm/kernel/unwind.c
+--- linux-2.6.36/arch/arm/kernel/unwind.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/kernel/unwind.c	2011-02-07 13:36:02.000000000 +0530
+@@ -277,7 +277,7 @@
+ 
+ 	/* only go to a higher address on the stack */
+ 	low = frame->sp;
+-	high = ALIGN(low, THREAD_SIZE) + THREAD_SIZE;
++	high = ALIGN(low, THREAD_SIZE);
+ 
+ 	pr_debug("%s(pc = %08lx lr = %08lx sp = %08lx)\n", __func__,
+ 		 frame->pc, frame->lr, frame->sp);
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/lib/getuser.S linux-arm/arch/arm/lib/getuser.S
+--- linux-2.6.36/arch/arm/lib/getuser.S	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/lib/getuser.S	2011-02-07 13:36:02.000000000 +0530
+@@ -28,20 +28,21 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/errno.h>
++#include <asm/domain.h>
+ 
+ ENTRY(__get_user_1)
+-1:	ldrbt	r2, [r0]
++1:	T(ldrb)	r2, [r0]
+ 	mov	r0, #0
+ 	mov	pc, lr
+ ENDPROC(__get_user_1)
+ 
+ ENTRY(__get_user_2)
+ #ifdef CONFIG_THUMB2_KERNEL
+-2:	ldrbt	r2, [r0]
+-3:	ldrbt	r3, [r0, #1]
++2:	T(ldrb)	r2, [r0]
++3:	T(ldrb)	r3, [r0, #1]
+ #else
+-2:	ldrbt	r2, [r0], #1
+-3:	ldrbt	r3, [r0]
++2:	T(ldrb)	r2, [r0], #1
++3:	T(ldrb)	r3, [r0]
+ #endif
+ #ifndef __ARMEB__
+ 	orr	r2, r2, r3, lsl #8
+@@ -53,7 +54,7 @@
+ ENDPROC(__get_user_2)
+ 
+ ENTRY(__get_user_4)
+-4:	ldrt	r2, [r0]
++4:	T(ldr)	r2, [r0]
+ 	mov	r0, #0
+ 	mov	pc, lr
+ ENDPROC(__get_user_4)
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/lib/putuser.S linux-arm/arch/arm/lib/putuser.S
+--- linux-2.6.36/arch/arm/lib/putuser.S	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/lib/putuser.S	2011-02-07 13:36:02.000000000 +0530
+@@ -28,9 +28,10 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/errno.h>
++#include <asm/domain.h>
+ 
+ ENTRY(__put_user_1)
+-1:	strbt	r2, [r0]
++1:	T(strb)	r2, [r0]
+ 	mov	r0, #0
+ 	mov	pc, lr
+ ENDPROC(__put_user_1)
+@@ -39,19 +40,19 @@
+ 	mov	ip, r2, lsr #8
+ #ifdef CONFIG_THUMB2_KERNEL
+ #ifndef __ARMEB__
+-2:	strbt	r2, [r0]
+-3:	strbt	ip, [r0, #1]
++2:	T(strb)	r2, [r0]
++3:	T(strb)	ip, [r0, #1]
+ #else
+-2:	strbt	ip, [r0]
+-3:	strbt	r2, [r0, #1]
++2:	T(strb)	ip, [r0]
++3:	T(strb)	r2, [r0, #1]
+ #endif
+ #else	/* !CONFIG_THUMB2_KERNEL */
+ #ifndef __ARMEB__
+-2:	strbt	r2, [r0], #1
+-3:	strbt	ip, [r0]
++2:	T(strb)	r2, [r0], #1
++3:	T(strb)	ip, [r0]
+ #else
+-2:	strbt	ip, [r0], #1
+-3:	strbt	r2, [r0]
++2:	T(strb)	ip, [r0], #1
++3:	T(strb)	r2, [r0]
+ #endif
+ #endif	/* CONFIG_THUMB2_KERNEL */
+ 	mov	r0, #0
+@@ -59,18 +60,18 @@
+ ENDPROC(__put_user_2)
+ 
+ ENTRY(__put_user_4)
+-4:	strt	r2, [r0]
++4:	T(str)	r2, [r0]
+ 	mov	r0, #0
+ 	mov	pc, lr
+ ENDPROC(__put_user_4)
+ 
+ ENTRY(__put_user_8)
+ #ifdef CONFIG_THUMB2_KERNEL
+-5:	strt	r2, [r0]
+-6:	strt	r3, [r0, #4]
++5:	T(str)	r2, [r0]
++6:	T(str)	r3, [r0, #4]
+ #else
+-5:	strt	r2, [r0], #4
+-6:	strt	r3, [r0]
++5:	T(str)	r2, [r0], #4
++6:	T(str)	r3, [r0]
+ #endif
+ 	mov	r0, #0
+ 	mov	pc, lr
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/lib/uaccess.S linux-arm/arch/arm/lib/uaccess.S
+--- linux-2.6.36/arch/arm/lib/uaccess.S	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/lib/uaccess.S	2011-02-07 13:36:02.000000000 +0530
+@@ -14,6 +14,7 @@
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ #include <asm/errno.h>
++#include <asm/domain.h>
+ 
+ 		.text
+ 
+@@ -31,11 +32,11 @@
+ 		rsb	ip, ip, #4
+ 		cmp	ip, #2
+ 		ldrb	r3, [r1], #1
+-USER(		strbt	r3, [r0], #1)			@ May fault
++USER(		T(strb)	r3, [r0], #1)			@ May fault
+ 		ldrgeb	r3, [r1], #1
+-USER(		strgebt	r3, [r0], #1)			@ May fault
++USER(		T(strgeb) r3, [r0], #1)			@ May fault
+ 		ldrgtb	r3, [r1], #1
+-USER(		strgtbt	r3, [r0], #1)			@ May fault
++USER(		T(strgtb) r3, [r0], #1)			@ May fault
+ 		sub	r2, r2, ip
+ 		b	.Lc2u_dest_aligned
+ 
+@@ -58,7 +59,7 @@
+ 		addmi	ip, r2, #4
+ 		bmi	.Lc2u_0nowords
+ 		ldr	r3, [r1], #4
+-USER(		strt	r3, [r0], #4)			@ May fault
++USER(		T(str)	r3, [r0], #4)			@ May fault
+ 		mov	ip, r0, lsl #32 - PAGE_SHIFT	@ On each page, use a ld/st??t instruction
+ 		rsb	ip, ip, #0
+ 		movs	ip, ip, lsr #32 - PAGE_SHIFT
+@@ -87,18 +88,18 @@
+ 		stmneia	r0!, {r3 - r4}			@ Shouldnt fault
+ 		tst	ip, #4
+ 		ldrne	r3, [r1], #4
+-		strnet	r3, [r0], #4			@ Shouldnt fault
++		T(strne) r3, [r0], #4			@ Shouldnt fault
+ 		ands	ip, ip, #3
+ 		beq	.Lc2u_0fupi
+ .Lc2u_0nowords:	teq	ip, #0
+ 		beq	.Lc2u_finished
+ .Lc2u_nowords:	cmp	ip, #2
+ 		ldrb	r3, [r1], #1
+-USER(		strbt	r3, [r0], #1)			@ May fault
++USER(		T(strb)	r3, [r0], #1)			@ May fault
+ 		ldrgeb	r3, [r1], #1
+-USER(		strgebt	r3, [r0], #1)			@ May fault
++USER(		T(strgeb) r3, [r0], #1)			@ May fault
+ 		ldrgtb	r3, [r1], #1
+-USER(		strgtbt	r3, [r0], #1)			@ May fault
++USER(		T(strgtb) r3, [r0], #1)			@ May fault
+ 		b	.Lc2u_finished
+ 
+ .Lc2u_not_enough:
+@@ -119,7 +120,7 @@
+ 		mov	r3, r7, pull #8
+ 		ldr	r7, [r1], #4
+ 		orr	r3, r3, r7, push #24
+-USER(		strt	r3, [r0], #4)			@ May fault
++USER(		T(str)	r3, [r0], #4)			@ May fault
+ 		mov	ip, r0, lsl #32 - PAGE_SHIFT
+ 		rsb	ip, ip, #0
+ 		movs	ip, ip, lsr #32 - PAGE_SHIFT
+@@ -154,18 +155,18 @@
+ 		movne	r3, r7, pull #8
+ 		ldrne	r7, [r1], #4
+ 		orrne	r3, r3, r7, push #24
+-		strnet	r3, [r0], #4			@ Shouldnt fault
++		T(strne) r3, [r0], #4			@ Shouldnt fault
+ 		ands	ip, ip, #3
+ 		beq	.Lc2u_1fupi
+ .Lc2u_1nowords:	mov	r3, r7, get_byte_1
+ 		teq	ip, #0
+ 		beq	.Lc2u_finished
+ 		cmp	ip, #2
+-USER(		strbt	r3, [r0], #1)			@ May fault
++USER(		T(strb)	r3, [r0], #1)			@ May fault
+ 		movge	r3, r7, get_byte_2
+-USER(		strgebt	r3, [r0], #1)			@ May fault
++USER(		T(strgeb) r3, [r0], #1)			@ May fault
+ 		movgt	r3, r7, get_byte_3
+-USER(		strgtbt	r3, [r0], #1)			@ May fault
++USER(		T(strgtb) r3, [r0], #1)			@ May fault
+ 		b	.Lc2u_finished
+ 
+ .Lc2u_2fupi:	subs	r2, r2, #4
+@@ -174,7 +175,7 @@
+ 		mov	r3, r7, pull #16
+ 		ldr	r7, [r1], #4
+ 		orr	r3, r3, r7, push #16
+-USER(		strt	r3, [r0], #4)			@ May fault
++USER(		T(str)	r3, [r0], #4)			@ May fault
+ 		mov	ip, r0, lsl #32 - PAGE_SHIFT
+ 		rsb	ip, ip, #0
+ 		movs	ip, ip, lsr #32 - PAGE_SHIFT
+@@ -209,18 +210,18 @@
+ 		movne	r3, r7, pull #16
+ 		ldrne	r7, [r1], #4
+ 		orrne	r3, r3, r7, push #16
+-		strnet	r3, [r0], #4			@ Shouldnt fault
++		T(strne) r3, [r0], #4			@ Shouldnt fault
+ 		ands	ip, ip, #3
+ 		beq	.Lc2u_2fupi
+ .Lc2u_2nowords:	mov	r3, r7, get_byte_2
+ 		teq	ip, #0
+ 		beq	.Lc2u_finished
+ 		cmp	ip, #2
+-USER(		strbt	r3, [r0], #1)			@ May fault
++USER(		T(strb)	r3, [r0], #1)			@ May fault
+ 		movge	r3, r7, get_byte_3
+-USER(		strgebt	r3, [r0], #1)			@ May fault
++USER(		T(strgeb) r3, [r0], #1)			@ May fault
+ 		ldrgtb	r3, [r1], #0
+-USER(		strgtbt	r3, [r0], #1)			@ May fault
++USER(		T(strgtb) r3, [r0], #1)			@ May fault
+ 		b	.Lc2u_finished
+ 
+ .Lc2u_3fupi:	subs	r2, r2, #4
+@@ -229,7 +230,7 @@
+ 		mov	r3, r7, pull #24
+ 		ldr	r7, [r1], #4
+ 		orr	r3, r3, r7, push #8
+-USER(		strt	r3, [r0], #4)			@ May fault
++USER(		T(str)	r3, [r0], #4)			@ May fault
+ 		mov	ip, r0, lsl #32 - PAGE_SHIFT
+ 		rsb	ip, ip, #0
+ 		movs	ip, ip, lsr #32 - PAGE_SHIFT
+@@ -264,18 +265,18 @@
+ 		movne	r3, r7, pull #24
+ 		ldrne	r7, [r1], #4
+ 		orrne	r3, r3, r7, push #8
+-		strnet	r3, [r0], #4			@ Shouldnt fault
++		T(strne) r3, [r0], #4			@ Shouldnt fault
+ 		ands	ip, ip, #3
+ 		beq	.Lc2u_3fupi
+ .Lc2u_3nowords:	mov	r3, r7, get_byte_3
+ 		teq	ip, #0
+ 		beq	.Lc2u_finished
+ 		cmp	ip, #2
+-USER(		strbt	r3, [r0], #1)			@ May fault
++USER(		T(strb)	r3, [r0], #1)			@ May fault
+ 		ldrgeb	r3, [r1], #1
+-USER(		strgebt	r3, [r0], #1)			@ May fault
++USER(		T(strgeb) r3, [r0], #1)			@ May fault
+ 		ldrgtb	r3, [r1], #0
+-USER(		strgtbt	r3, [r0], #1)			@ May fault
++USER(		T(strgtb) r3, [r0], #1)			@ May fault
+ 		b	.Lc2u_finished
+ ENDPROC(__copy_to_user)
+ 
+@@ -294,11 +295,11 @@
+ .Lcfu_dest_not_aligned:
+ 		rsb	ip, ip, #4
+ 		cmp	ip, #2
+-USER(		ldrbt	r3, [r1], #1)			@ May fault
++USER(		T(ldrb)	r3, [r1], #1)			@ May fault
+ 		strb	r3, [r0], #1
+-USER(		ldrgebt	r3, [r1], #1)			@ May fault
++USER(		T(ldrgeb) r3, [r1], #1)			@ May fault
+ 		strgeb	r3, [r0], #1
+-USER(		ldrgtbt	r3, [r1], #1)			@ May fault
++USER(		T(ldrgtb) r3, [r1], #1)			@ May fault
+ 		strgtb	r3, [r0], #1
+ 		sub	r2, r2, ip
+ 		b	.Lcfu_dest_aligned
+@@ -321,7 +322,7 @@
+ .Lcfu_0fupi:	subs	r2, r2, #4
+ 		addmi	ip, r2, #4
+ 		bmi	.Lcfu_0nowords
+-USER(		ldrt	r3, [r1], #4)
++USER(		T(ldr)	r3, [r1], #4)
+ 		str	r3, [r0], #4
+ 		mov	ip, r1, lsl #32 - PAGE_SHIFT	@ On each page, use a ld/st??t instruction
+ 		rsb	ip, ip, #0
+@@ -350,18 +351,18 @@
+ 		ldmneia	r1!, {r3 - r4}			@ Shouldnt fault
+ 		stmneia	r0!, {r3 - r4}
+ 		tst	ip, #4
+-		ldrnet	r3, [r1], #4			@ Shouldnt fault
++		T(ldrne) r3, [r1], #4			@ Shouldnt fault
+ 		strne	r3, [r0], #4
+ 		ands	ip, ip, #3
+ 		beq	.Lcfu_0fupi
+ .Lcfu_0nowords:	teq	ip, #0
+ 		beq	.Lcfu_finished
+ .Lcfu_nowords:	cmp	ip, #2
+-USER(		ldrbt	r3, [r1], #1)			@ May fault
++USER(		T(ldrb)	r3, [r1], #1)			@ May fault
+ 		strb	r3, [r0], #1
+-USER(		ldrgebt	r3, [r1], #1)			@ May fault
++USER(		T(ldrgeb) r3, [r1], #1)			@ May fault
+ 		strgeb	r3, [r0], #1
+-USER(		ldrgtbt	r3, [r1], #1)			@ May fault
++USER(		T(ldrgtb) r3, [r1], #1)			@ May fault
+ 		strgtb	r3, [r0], #1
+ 		b	.Lcfu_finished
+ 
+@@ -374,7 +375,7 @@
+ 
+ .Lcfu_src_not_aligned:
+ 		bic	r1, r1, #3
+-USER(		ldrt	r7, [r1], #4)			@ May fault
++USER(		T(ldr)	r7, [r1], #4)			@ May fault
+ 		cmp	ip, #2
+ 		bgt	.Lcfu_3fupi
+ 		beq	.Lcfu_2fupi
+@@ -382,7 +383,7 @@
+ 		addmi	ip, r2, #4
+ 		bmi	.Lcfu_1nowords
+ 		mov	r3, r7, pull #8
+-USER(		ldrt	r7, [r1], #4)			@ May fault
++USER(		T(ldr)	r7, [r1], #4)			@ May fault
+ 		orr	r3, r3, r7, push #24
+ 		str	r3, [r0], #4
+ 		mov	ip, r1, lsl #32 - PAGE_SHIFT
+@@ -417,7 +418,7 @@
+ 		stmneia	r0!, {r3 - r4}
+ 		tst	ip, #4
+ 		movne	r3, r7, pull #8
+-USER(		ldrnet	r7, [r1], #4)			@ May fault
++USER(		T(ldrne) r7, [r1], #4)			@ May fault
+ 		orrne	r3, r3, r7, push #24
+ 		strne	r3, [r0], #4
+ 		ands	ip, ip, #3
+@@ -437,7 +438,7 @@
+ 		addmi	ip, r2, #4
+ 		bmi	.Lcfu_2nowords
+ 		mov	r3, r7, pull #16
+-USER(		ldrt	r7, [r1], #4)			@ May fault
++USER(		T(ldr)	r7, [r1], #4)			@ May fault
+ 		orr	r3, r3, r7, push #16
+ 		str	r3, [r0], #4
+ 		mov	ip, r1, lsl #32 - PAGE_SHIFT
+@@ -473,7 +474,7 @@
+ 		stmneia	r0!, {r3 - r4}
+ 		tst	ip, #4
+ 		movne	r3, r7, pull #16
+-USER(		ldrnet	r7, [r1], #4)			@ May fault
++USER(		T(ldrne) r7, [r1], #4)			@ May fault
+ 		orrne	r3, r3, r7, push #16
+ 		strne	r3, [r0], #4
+ 		ands	ip, ip, #3
+@@ -485,7 +486,7 @@
+ 		strb	r3, [r0], #1
+ 		movge	r3, r7, get_byte_3
+ 		strgeb	r3, [r0], #1
+-USER(		ldrgtbt	r3, [r1], #0)			@ May fault
++USER(		T(ldrgtb) r3, [r1], #0)			@ May fault
+ 		strgtb	r3, [r0], #1
+ 		b	.Lcfu_finished
+ 
+@@ -493,7 +494,7 @@
+ 		addmi	ip, r2, #4
+ 		bmi	.Lcfu_3nowords
+ 		mov	r3, r7, pull #24
+-USER(		ldrt	r7, [r1], #4)			@ May fault
++USER(		T(ldr)	r7, [r1], #4)			@ May fault
+ 		orr	r3, r3, r7, push #8
+ 		str	r3, [r0], #4
+ 		mov	ip, r1, lsl #32 - PAGE_SHIFT
+@@ -528,7 +529,7 @@
+ 		stmneia	r0!, {r3 - r4}
+ 		tst	ip, #4
+ 		movne	r3, r7, pull #24
+-USER(		ldrnet	r7, [r1], #4)			@ May fault
++USER(		T(ldrne) r7, [r1], #4)			@ May fault
+ 		orrne	r3, r3, r7, push #8
+ 		strne	r3, [r0], #4
+ 		ands	ip, ip, #3
+@@ -538,9 +539,9 @@
+ 		beq	.Lcfu_finished
+ 		cmp	ip, #2
+ 		strb	r3, [r0], #1
+-USER(		ldrgebt	r3, [r1], #1)			@ May fault
++USER(		T(ldrgeb) r3, [r1], #1)			@ May fault
+ 		strgeb	r3, [r0], #1
+-USER(		ldrgtbt	r3, [r1], #1)			@ May fault
++USER(		T(ldrgtb) r3, [r1], #1)			@ May fault
+ 		strgtb	r3, [r0], #1
+ 		b	.Lcfu_finished
+ ENDPROC(__copy_from_user)
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mach-vexpress/ct-ca9x4.c linux-arm/arch/arm/mach-vexpress/ct-ca9x4.c
+--- linux-2.6.36/arch/arm/mach-vexpress/ct-ca9x4.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mach-vexpress/ct-ca9x4.c	2011-02-07 13:36:02.000000000 +0530
+@@ -54,7 +54,9 @@
+ 
+ static void __init ct_ca9x4_map_io(void)
+ {
++#ifdef CONFIG_LOCAL_TIMERS
+ 	twd_base = MMIO_P2V(A9_MPCORE_TWD);
++#endif
+ 	v2m_map_io(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
+ }
+ 
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/cache-l2x0.c linux-arm/arch/arm/mm/cache-l2x0.c
+--- linux-2.6.36/arch/arm/mm/cache-l2x0.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/cache-l2x0.c	2011-02-07 13:36:02.000000000 +0530
+@@ -29,13 +29,22 @@
+ static DEFINE_SPINLOCK(l2x0_lock);
+ static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
+ 
+-static inline void cache_wait(void __iomem *reg, unsigned long mask)
++static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+ {
+-	/* wait for the operation to complete */
++	/* wait for cache operation by line or way to complete */
+ 	while (readl_relaxed(reg) & mask)
+ 		;
+ }
+ 
++#ifdef CONFIG_CACHE_PL310
++static inline void cache_wait(void __iomem *reg, unsigned long mask)
++{
++	/* cache operations by line are atomic on PL310 */
++}
++#else
++#define cache_wait	cache_wait_way
++#endif
++
+ static inline void cache_sync(void)
+ {
+ 	void __iomem *base = l2x0_base;
+@@ -110,7 +119,7 @@
+ 	/* invalidate all ways */
+ 	spin_lock_irqsave(&l2x0_lock, flags);
+ 	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
+-	cache_wait(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
++	cache_wait_way(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
+ 	cache_sync();
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/copypage-v4mc.c linux-arm/arch/arm/mm/copypage-v4mc.c
+--- linux-2.6.36/arch/arm/mm/copypage-v4mc.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/copypage-v4mc.c	2011-02-07 13:36:02.000000000 +0530
+@@ -73,7 +73,7 @@
+ {
+ 	void *kto = kmap_atomic(to, KM_USER1);
+ 
+-	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
++	if (!test_and_set_bit(PG_dcache_clean, &from->flags))
+ 		__flush_dcache_page(page_mapping(from), from);
+ 
+ 	spin_lock(&minicache_lock);
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/copypage-v6.c linux-arm/arch/arm/mm/copypage-v6.c
+--- linux-2.6.36/arch/arm/mm/copypage-v6.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/copypage-v6.c	2011-02-07 13:36:02.000000000 +0530
+@@ -79,7 +79,7 @@
+ 	unsigned int offset = CACHE_COLOUR(vaddr);
+ 	unsigned long kfrom, kto;
+ 
+-	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
++	if (!test_and_set_bit(PG_dcache_clean, &from->flags))
+ 		__flush_dcache_page(page_mapping(from), from);
+ 
+ 	/* FIXME: not highmem safe */
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/copypage-xscale.c linux-arm/arch/arm/mm/copypage-xscale.c
+--- linux-2.6.36/arch/arm/mm/copypage-xscale.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/copypage-xscale.c	2011-02-07 13:36:02.000000000 +0530
+@@ -95,7 +95,7 @@
+ {
+ 	void *kto = kmap_atomic(to, KM_USER1);
+ 
+-	if (test_and_clear_bit(PG_dcache_dirty, &from->flags))
++	if (!test_and_set_bit(PG_dcache_clean, &from->flags))
+ 		__flush_dcache_page(page_mapping(from), from);
+ 
+ 	spin_lock(&minicache_lock);
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/dma-mapping.c linux-arm/arch/arm/mm/dma-mapping.c
+--- linux-2.6.36/arch/arm/mm/dma-mapping.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/dma-mapping.c	2011-02-07 13:36:02.000000000 +0530
+@@ -523,6 +523,12 @@
+ 		outer_inv_range(paddr, paddr + size);
+ 
+ 	dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
++
++	/*
++	 * Mark the D-cache clean for this page to avoid extra flushing.
++	 */
++	if (dir != DMA_TO_DEVICE && off == 0 && size >= PAGE_SIZE)
++		set_bit(PG_dcache_clean, &page->flags);
+ }
+ EXPORT_SYMBOL(___dma_page_dev_to_cpu);
+ 
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/fault-armv.c linux-arm/arch/arm/mm/fault-armv.c
+--- linux-2.6.36/arch/arm/mm/fault-armv.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/fault-armv.c	2011-02-07 13:36:02.000000000 +0530
+@@ -28,6 +28,7 @@
+ 
+ static unsigned long shared_pte_mask = L_PTE_MT_BUFFERABLE;
+ 
++#if __LINUX_ARM_ARCH__ < 6
+ /*
+  * We take the easy way out of this problem - we make the
+  * PTE uncacheable.  However, we leave the write buffer on.
+@@ -141,7 +142,7 @@
+  * a page table, or changing an existing PTE.  Basically, there are two
+  * things that we need to take care of:
+  *
+- *  1. If PG_dcache_dirty is set for the page, we need to ensure
++ *  1. If PG_dcache_clean is not set for the page, we need to ensure
+  *     that any cache entries for the kernels virtual memory
+  *     range are written back to the page.
+  *  2. If we have multiple shared mappings of the same space in
+@@ -168,10 +169,8 @@
+ 		return;
+ 
+ 	mapping = page_mapping(page);
+-#ifndef CONFIG_SMP
+-	if (test_and_clear_bit(PG_dcache_dirty, &page->flags))
++	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+ 		__flush_dcache_page(mapping, page);
+-#endif
+ 	if (mapping) {
+ 		if (cache_is_vivt())
+ 			make_coherent(mapping, vma, addr, ptep, pfn);
+@@ -179,6 +178,7 @@
+ 			__flush_icache_all();
+ 	}
+ }
++#endif	/* __LINUX_ARM_ARCH__ < 6 */
+ 
+ /*
+  * Check whether the write buffer has physical address aliasing
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/fault.c linux-arm/arch/arm/mm/fault.c
+--- linux-2.6.36/arch/arm/mm/fault.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/fault.c	2011-02-07 13:36:02.000000000 +0530
+@@ -581,6 +581,19 @@
+ 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
+ };
+ 
++void __init
++hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
++		 int sig, int code, const char *name)
++{
++	if (nr < 0 || nr >= ARRAY_SIZE(ifsr_info))
++		BUG();
++
++	ifsr_info[nr].fn   = fn;
++	ifsr_info[nr].sig  = sig;
++	ifsr_info[nr].code = code;
++	ifsr_info[nr].name = name;
++}
++
+ asmlinkage void __exception
+ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+ {
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/flush.c linux-arm/arch/arm/mm/flush.c
+--- linux-2.6.36/arch/arm/mm/flush.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/flush.c	2011-02-07 13:36:02.000000000 +0530
+@@ -17,6 +17,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/system.h>
+ #include <asm/tlbflush.h>
++#include <asm/smp_plat.h>
+ 
+ #include "mm.h"
+ 
+@@ -39,6 +40,18 @@
+ 	    : "cc");
+ }
+ 
++static void flush_icache_alias(unsigned long pfn, unsigned long vaddr, unsigned long len)
++{
++	unsigned long colour = CACHE_COLOUR(vaddr);
++	unsigned long offset = vaddr & (PAGE_SIZE - 1);
++	unsigned long to;
++
++	set_pte_ext(TOP_PTE(ALIAS_FLUSH_START) + colour, pfn_pte(pfn, PAGE_KERNEL), 0);
++	to = ALIAS_FLUSH_START + (colour << PAGE_SHIFT) + offset;
++	flush_tlb_kernel_page(to);
++	flush_icache_range(to, to + len);
++}
++
+ void flush_cache_mm(struct mm_struct *mm)
+ {
+ 	if (cache_is_vivt()) {
+@@ -89,16 +102,16 @@
+ 	if (vma->vm_flags & VM_EXEC && icache_is_vivt_asid_tagged())
+ 		__flush_icache_all();
+ }
++
+ #else
+-#define flush_pfn_alias(pfn,vaddr)	do { } while (0)
++#define flush_pfn_alias(pfn,vaddr)		do { } while (0)
++#define flush_icache_alias(pfn,vaddr,len)	do { } while (0)
+ #endif
+ 
+-#ifdef CONFIG_SMP
+ static void flush_ptrace_access_other(void *args)
+ {
+ 	__flush_icache_all();
+ }
+-#endif
+ 
+ static
+ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
+@@ -118,15 +131,16 @@
+ 		return;
+ 	}
+ 
+-	/* VIPT non-aliasing cache */
++	/* VIPT non-aliasing D-cache */
+ 	if (vma->vm_flags & VM_EXEC) {
+ 		unsigned long addr = (unsigned long)kaddr;
+-		__cpuc_coherent_kern_range(addr, addr + len);
+-#ifdef CONFIG_SMP
++		if (icache_is_vipt_aliasing())
++			flush_icache_alias(page_to_pfn(page), uaddr, len);
++		else
++			__cpuc_coherent_kern_range(addr, addr + len);
+ 		if (cache_ops_need_broadcast())
+ 			smp_call_function(flush_ptrace_access_other,
+ 					  NULL, 1);
+-#endif
+ 	}
+ }
+ 
+@@ -215,6 +229,36 @@
+ 	flush_dcache_mmap_unlock(mapping);
+ }
+ 
++#if __LINUX_ARM_ARCH__ >= 6
++void __sync_icache_dcache(pte_t pteval)
++{
++	unsigned long pfn;
++	struct page *page;
++	struct address_space *mapping;
++
++	if (!pte_present_user(pteval))
++		return;
++	if (cache_is_vipt_nonaliasing() && !pte_exec(pteval))
++		/* only flush non-aliasing VIPT caches for exec mappings */
++		return;
++	pfn = pte_pfn(pteval);
++	if (!pfn_valid(pfn))
++		return;
++
++	page = pfn_to_page(pfn);
++	if (cache_is_vipt_aliasing())
++		mapping = page_mapping(page);
++	else
++		mapping = NULL;
++
++	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
++		__flush_dcache_page(mapping, page);
++	/* pte_exec() already checked above for non-aliasing VIPT cache */
++	if (cache_is_vipt_nonaliasing() || pte_exec(pteval))
++		__flush_icache_all();
++}
++#endif
++
+ /*
+  * Ensure cache coherency between kernel mapping and userspace mapping
+  * of this page.
+@@ -246,17 +290,16 @@
+ 
+ 	mapping = page_mapping(page);
+ 
+-#ifndef CONFIG_SMP
+-	if (!PageHighMem(page) && mapping && !mapping_mapped(mapping))
+-		set_bit(PG_dcache_dirty, &page->flags);
+-	else
+-#endif
+-	{
++	if (!cache_ops_need_broadcast() &&
++	    mapping && !mapping_mapped(mapping))
++		clear_bit(PG_dcache_clean, &page->flags);
++	else {
+ 		__flush_dcache_page(mapping, page);
+ 		if (mapping && cache_is_vivt())
+ 			__flush_dcache_aliases(mapping, page);
+ 		else if (mapping)
+ 			__flush_icache_all();
++		set_bit(PG_dcache_clean, &page->flags);
+ 	}
+ }
+ EXPORT_SYMBOL(flush_dcache_page);
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/Kconfig linux-arm/arch/arm/mm/Kconfig
+--- linux-2.6.36/arch/arm/mm/Kconfig	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/Kconfig	2011-02-07 13:36:02.000000000 +0530
+@@ -599,6 +599,14 @@
+ 	help
+ 	  Processor has the CP15 register, which has MPU related registers.
+ 
++config CPU_USE_DOMAINS
++	bool
++	depends on MMU
++	default y if !CPU_32v6K
++	help
++	  This option enables or disables the use of domain switching
++	  via the set_fs() function.
++
+ #
+ # CPU supports 36-bit I/O
+ #
+@@ -628,6 +636,33 @@
+ 	  Say Y here if you have a CPU with the ThumbEE extension and code to
+ 	  make use of it. Say N for code that can run on CPUs without ThumbEE.
+ 
++config SWP_EMULATE
++	bool "Emulate SWP/SWPB instructions"
++	depends on CPU_V7 && !CPU_V6
++	select HAVE_PROC_CPU if PROC_FS
++	default y if SMP
++	help
++	  ARMv6 architecture deprecates use of the SWP/SWPB instructions.
++	  ARMv7 multiprocessing extensions introduce the ability to disable
++	  these instructions, triggering an undefined instruction exception
++	  when executed. Say Y here to enable software emulation of these
++	  instructions for userspace (not kernel) using LDREX/STREX.
++	  Also creates /proc/cpu/swp_emulation for statistics.
++
++	  In some older versions of glibc [<=2.8] SWP is used during futex
++	  trylock() operations with the assumption that the code will not
++	  be preempted. This invalid assumption may be more likely to fail
++	  with SWP emulation enabled, leading to deadlock of the user
++	  application.
++
++	  NOTE: when accessing uncached shared regions, LDREX/STREX rely
++	  on an external transaction monitoring block called a global
++	  monitor to maintain update atomicity. If your system does not
++	  implement a global monitor, this option can cause programs that
++	  perform SWP operations to uncached memory to deadlock.
++
++	  If unsure, say Y.
++
+ config CPU_BIG_ENDIAN
+ 	bool "Build big-endian kernel"
+ 	depends on ARCH_SUPPORTS_BIG_ENDIAN
+@@ -779,6 +814,14 @@
+ 	help
+ 	  This option enables the L2x0 PrimeCell.
+ 
++config CACHE_PL310
++	bool
++	depends on CACHE_L2X0
++	default y if CPU_V7 && !CPU_V6
++	help
++	  This option enables optimisations for the PL310 cache
++	  controller.
++
+ config CACHE_TAUROS2
+ 	bool "Enable the Tauros2 L2 cache controller"
+ 	depends on (ARCH_DOVE || ARCH_MMP)
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/mmu.c linux-arm/arch/arm/mm/mmu.c
+--- linux-2.6.36/arch/arm/mm/mmu.c	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/mmu.c	2011-02-07 13:36:02.000000000 +0530
+@@ -25,6 +25,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/tlb.h>
+ #include <asm/highmem.h>
++#include <asm/traps.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -910,12 +911,11 @@
+ {
+ 	struct map_desc map;
+ 	unsigned long addr;
+-	void *vectors;
+ 
+ 	/*
+ 	 * Allocate the vector page early.
+ 	 */
+-	vectors = early_alloc(PAGE_SIZE);
++	vectors_page = early_alloc(PAGE_SIZE);
+ 
+ 	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+@@ -955,7 +955,7 @@
+ 	 * location (0xffff0000).  If we aren't using high-vectors, also
+ 	 * create a mapping at the low-vectors virtual address.
+ 	 */
+-	map.pfn = __phys_to_pfn(virt_to_phys(vectors));
++	map.pfn = __phys_to_pfn(virt_to_phys(vectors_page));
+ 	map.virtual = 0xffff0000;
+ 	map.length = PAGE_SIZE;
+ 	map.type = MT_HIGH_VECTORS;
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/proc-macros.S linux-arm/arch/arm/mm/proc-macros.S
+--- linux-2.6.36/arch/arm/mm/proc-macros.S	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/proc-macros.S	2011-02-07 13:36:02.000000000 +0530
+@@ -99,6 +99,10 @@
+  *  110x   0   1   0	r/w	r/o
+  *  11x0   0   1   0	r/w	r/o
+  *  1111   0   1   1	r/w	r/w
++ *
++ * If !CONFIG_CPU_USE_DOMAINS, the following permissions are changed:
++ *  110x   1   1   1	r/o	r/o
++ *  11x0   1   1   1	r/o	r/o
+  */
+ 	.macro	armv6_mt_table pfx
+ \pfx\()_mt_table:
+@@ -138,8 +142,11 @@
+ 
+ 	tst	r1, #L_PTE_USER
+ 	orrne	r3, r3, #PTE_EXT_AP1
++#ifdef CONFIG_CPU_USE_DOMAINS
++	@ allow kernel read/write access to read-only user pages
+ 	tstne	r3, #PTE_EXT_APX
+ 	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
++#endif
+ 
+ 	tst	r1, #L_PTE_EXEC
+ 	orreq	r3, r3, #PTE_EXT_XN
+diff --exclude-from=exclude_list -aurN linux-2.6.36/arch/arm/mm/proc-v7.S linux-arm/arch/arm/mm/proc-v7.S
+--- linux-2.6.36/arch/arm/mm/proc-v7.S	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/arch/arm/mm/proc-v7.S	2011-02-07 13:36:02.000000000 +0530
+@@ -149,8 +149,11 @@
+ 
+ 	tst	r1, #L_PTE_USER
+ 	orrne	r3, r3, #PTE_EXT_AP1
++#ifdef CONFIG_CPU_USE_DOMAINS
++	@ allow kernel read/write access to read-only user pages
+ 	tstne	r3, #PTE_EXT_APX
+ 	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
++#endif
+ 
+ 	tst	r1, #L_PTE_EXEC
+ 	orreq	r3, r3, #PTE_EXT_XN
+@@ -272,8 +275,6 @@
+ 	mcr	p15, 0, r10, c2, c0, 2		@ TTB control register
+ 	orr	r4, r4, #TTB_FLAGS
+ 	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
+-	mov	r10, #0x1f			@ domains 0, 1 = manager
+-	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
+ 	/*
+ 	 * Memory region attributes with SCTLR.TRE=1
+ 	 *
+@@ -312,6 +313,10 @@
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 	orr	r6, r6, #1 << 25		@ big-endian page tables
+ #endif
++#ifdef CONFIG_SWP_EMULATE
++	orr     r5, r5, #(1 << 10)              @ set SW bit in "clear"
++	bic     r6, r6, #(1 << 10)              @ clear it in "mmuset"
++#endif
+    	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+ 	bic	r0, r0, r5			@ clear bits them
+ 	orr	r0, r0, r6			@ set them
+diff --exclude-from=exclude_list -aurN linux-2.6.36/Documentation/arm/00-INDEX linux-arm/Documentation/arm/00-INDEX
+--- linux-2.6.36/Documentation/arm/00-INDEX	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/Documentation/arm/00-INDEX	2011-02-07 13:36:02.000000000 +0530
+@@ -32,3 +32,5 @@
+ 	- description of the virtual memory layout
+ nwfpe/
+ 	- NWFPE floating point emulator documentation
++swp_emulation
++	- SWP/SWPB emulation handler/logging description
+diff --exclude-from=exclude_list -aurN linux-2.6.36/Documentation/arm/swp_emulation linux-arm/Documentation/arm/swp_emulation
+--- linux-2.6.36/Documentation/arm/swp_emulation	1970-01-01 05:30:00.000000000 +0530
++++ linux-arm/Documentation/arm/swp_emulation	2011-02-07 13:36:02.000000000 +0530
+@@ -0,0 +1,27 @@
++Software emulation of deprecated SWP instruction (CONFIG_SWP_EMULATE)
++---------------------------------------------------------------------
++
++ARMv6 architecture deprecates use of the SWP/SWPB instructions, and recommeds
++moving to the load-locked/store-conditional instructions LDREX and STREX.
++
++ARMv7 multiprocessing extensions introduce the ability to disable these
++instructions, triggering an undefined instruction exception when executed.
++Trapped instructions are emulated using an LDREX/STREX or LDREXB/STREXB
++sequence. If a memory access fault (an abort) occurs, a segmentation fault is
++signalled to the triggering process.
++
++/proc/cpu/swp_emulation holds some statistics/information, including the PID of
++the last process to trigger the emulation to be invocated. For example:
++---
++Emulated SWP:		12
++Emulated SWPB:		0
++Aborted SWP{B}:		1
++Last process:		314
++---
++
++NOTE: when accessing uncached shared regions, LDREX/STREX rely on an external
++transaction monitoring block called a global monitor to maintain update
++atomicity. If your system does not implement a global monitor, this option can
++cause programs that perform SWP operations to uncached memory to deadlock, as
++the STREX operation will always fail.
++
+diff --exclude-from=exclude_list -aurN linux-2.6.36/include/linux/mm.h linux-arm/include/linux/mm.h
+--- linux-2.6.36/include/linux/mm.h	2010-10-21 02:00:22.000000000 +0530
++++ linux-arm/include/linux/mm.h	2011-02-07 13:36:02.000000000 +0530
+@@ -497,8 +497,8 @@
+ #define NODES_PGSHIFT		(NODES_PGOFF * (NODES_WIDTH != 0))
+ #define ZONES_PGSHIFT		(ZONES_PGOFF * (ZONES_WIDTH != 0))
+ 
+-/* NODE:ZONE or SECTION:ZONE is used to ID a zone for the buddy allcator */
+-#ifdef NODE_NOT_IN_PAGEFLAGS
++/* NODE:ZONE or SECTION:ZONE is used to ID a zone for the buddy allocator */
++#ifdef NODE_NOT_IN_PAGE_FLAGS
+ #define ZONEID_SHIFT		(SECTIONS_SHIFT + ZONES_SHIFT)
+ #define ZONEID_PGOFF		((SECTIONS_PGOFF < ZONES_PGOFF)? \
+ 						SECTIONS_PGOFF : ZONES_PGOFF)

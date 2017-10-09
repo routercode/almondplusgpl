@@ -1,0 +1,358 @@
+diff -Naur linux-2.6.36/net/core/dev.c linux-2.6.36-new/net/core/dev.c
+--- linux-2.6.36/net/core/dev.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/net/core/dev.c	2011-09-04 11:07:53.000000000 -0700
+@@ -98,6 +98,9 @@
+ #include <net/net_namespace.h>
+ #include <net/sock.h>
+ #include <linux/rtnetlink.h>
++#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
++#include <linux/imq.h>
++#endif
+ #include <linux/proc_fs.h>
+ #include <linux/seq_file.h>
+ #include <linux/stat.h>
+@@ -1942,7 +1945,11 @@
+ 	int rc = NETDEV_TX_OK;
+ 
+ 	if (likely(!skb->next)) {
+-		if (!list_empty(&ptype_all))
++		if (!list_empty(&ptype_all)
++#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
++			&& !(skb->imq_flags & IMQ_F_ENQUEUE)
++#endif
++		   )
+ 			dev_queue_xmit_nit(skb, dev);
+ 
+ 		/*
+@@ -2054,8 +2061,7 @@
+ 	return queue_index;
+ }
+ 
+-static struct netdev_queue *dev_pick_tx(struct net_device *dev,
+-					struct sk_buff *skb)
++struct netdev_queue *dev_pick_tx(struct net_device *dev, struct sk_buff *skb)
+ {
+ 	int queue_index;
+ 	const struct net_device_ops *ops = dev->netdev_ops;
+@@ -2084,6 +2090,7 @@
+ 	skb_set_queue_mapping(skb, queue_index);
+ 	return netdev_get_tx_queue(dev, queue_index);
+ }
++EXPORT_SYMBOL(dev_pick_tx);
+ 
+ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
+ 				 struct net_device *dev,
+@@ -2540,6 +2547,63 @@
+ }
+ EXPORT_SYMBOL(netif_rx);
+ 
++#ifdef CONFIG_CS752X
++/**
++ * netif_rx_cs  -	post buffer to the network code dedicated for cs752x
++ * 			network processor
++ * @skb: buffer to post
++ *
++ * This function receives a packet from device driver and queue it for the
++ * upper (protocol) levels to process.
++ *
++ * return values:
++ * NET_RX_SUCCESS	(no congestion)
++ * NET_RX_DROP		(packet was dropped)
++ */
++int netif_rx_cs(struct sk_buff *skb)
++{
++	int ret;
++
++	/* if netpoll wants it, pretend we never saw it */
++	if (netpoll_rx(skb))
++		return NET_RX_DROP;
++
++	if (netdev_tstamp_prequeue)
++		net_timestamp_check(skb);
++
++#ifdef CONFIG_RPS
++	{
++		struct rps_dev_flow voidflow, *rflow = &voidflow;
++		int cpu, curr_cpu;
++
++		preempt_disable();
++		rcu_read_lock();
++
++		//cpu = get_rps_cpu(skb->dev, skb, &rflow);
++
++		curr_cpu = smp_processor_id();
++		cpu = curr_cpu ^ 0x1;
++		if (cpu == RPS_NO_CPU || !cpu_online(cpu))
++			cpu = curr_cpu;
++		rflow->last_qtail = per_cpu(softnet_data, cpu).input_queue_head;
++
++		ret = enqueue_to_backlog(skb, cpu, &rflow->last_qtail);
++
++		rcu_read_unlock();
++		preempt_enable();
++	}
++#else
++	{
++		unsigned int qtail;
++		ret = enqueue_to_backlog(skb, get_cpu(), &qtail);
++		put_cpu();
++	}
++#endif
++	return ret;
++}
++EXPORT_SYMBOL(netif_rx_cs);
++#endif
++
+ int netif_rx_ni(struct sk_buff *skb)
+ {
+ 	int err;
+diff -Naur linux-2.6.36/net/core/skbuff.c linux-2.6.36-new/net/core/skbuff.c
+--- linux-2.6.36/net/core/skbuff.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/net/core/skbuff.c	2011-09-04 11:07:53.000000000 -0700
+@@ -72,6 +72,9 @@
+ 
+ static struct kmem_cache *skbuff_head_cache __read_mostly;
+ static struct kmem_cache *skbuff_fclone_cache __read_mostly;
++#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
++static struct kmem_cache *skbuff_cb_store_cache __read_mostly;
++#endif
+ 
+ static void sock_pipe_buf_release(struct pipe_inode_info *pipe,
+ 				  struct pipe_buffer *buf)
+@@ -91,6 +94,87 @@
+ 	return 1;
+ }
+ 
++#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
++/* Control buffer save/restore for IMQ devices */
++struct skb_cb_table {
++	void			*cb_next;
++	atomic_t		refcnt;
++#if defined(CONFIG_CS752X_HW_ACCELERATION)
++	char			cb[48 + sizeof(CS_KERNEL_ACCEL_CB_T)];
++#else
++	char      		cb[48];
++#endif
++};
++
++static DEFINE_SPINLOCK(skb_cb_store_lock);
++
++int skb_save_cb(struct sk_buff *skb)
++{
++	struct skb_cb_table *next;
++
++	next = kmem_cache_alloc(skbuff_cb_store_cache, GFP_ATOMIC);
++	if (!next)
++		return -ENOMEM;
++
++	BUILD_BUG_ON(sizeof(skb->cb) != sizeof(next->cb));
++
++	memcpy(next->cb, skb->cb, sizeof(skb->cb));
++	next->cb_next = skb->cb_next;
++
++	atomic_set(&next->refcnt, 1);
++
++	skb->cb_next = next;
++	return 0;
++}
++EXPORT_SYMBOL(skb_save_cb);
++
++int skb_restore_cb(struct sk_buff *skb)
++{
++	struct skb_cb_table *next;
++
++	if (!skb->cb_next)
++		return 0;
++
++	next = skb->cb_next;
++
++	BUILD_BUG_ON(sizeof(skb->cb) != sizeof(next->cb));
++
++	memcpy(skb->cb, next->cb, sizeof(skb->cb));
++	skb->cb_next = next->cb_next;
++
++	spin_lock(&skb_cb_store_lock);
++
++	if (atomic_dec_and_test(&next->refcnt)) {
++		kmem_cache_free(skbuff_cb_store_cache, next);
++	}
++
++	spin_unlock(&skb_cb_store_lock);
++
++	return 0;
++}
++EXPORT_SYMBOL(skb_restore_cb);
++
++static void skb_copy_stored_cb(struct sk_buff *new, const struct sk_buff *__old)
++{
++	struct skb_cb_table *next;
++	struct sk_buff *old;
++
++	if (!__old->cb_next) {
++		new->cb_next = NULL;
++		return;
++	}
++
++	spin_lock(&skb_cb_store_lock);
++
++	old = (struct sk_buff *)__old;
++
++	next = old->cb_next;
++	atomic_inc(&next->refcnt);
++	new->cb_next = next;
++
++	spin_unlock(&skb_cb_store_lock);
++}
++#endif
+ 
+ /* Pipe buffer operations for a socket. */
+ static const struct pipe_buf_operations sock_pipe_buf_ops = {
+@@ -391,6 +475,26 @@
+ 		WARN_ON(in_irq());
+ 		skb->destructor(skb);
+ 	}
++#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
++	/* This should not happen. When it does, avoid memleak by restoring
++	the chain of cb-backups. */
++	while(skb->cb_next != NULL) {
++		if (net_ratelimit())
++			printk(KERN_WARNING "IMQ: kfree_skb: skb->cb_next: "
++				"%08x\n", (unsigned int)skb->cb_next);
++
++		skb_restore_cb(skb);
++	}
++	/* This should not happen either, nf_queue_entry is nullified in
++	 * imq_dev_xmit(). If we have non-NULL nf_queue_entry then we are
++	 * leaking entry pointers, maybe memory. We don't know if this is
++	 * pointer to already freed memory, or should this be freed.
++	 * If this happens we need to add refcounting, etc for nf_queue_entry.
++	 */
++	if (skb->nf_queue_entry && net_ratelimit())
++		printk(KERN_WARNING
++				"IMQ: kfree_skb: skb->nf_queue_entry != NULL");
++#endif	
+ #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
+ 	nf_conntrack_put(skb->nfct);
+ 	nf_conntrack_put_reasm(skb->nfct_reasm);
+@@ -526,6 +630,9 @@
+ 	new->sp			= secpath_get(old->sp);
+ #endif
+ 	memcpy(new->cb, old->cb, sizeof(old->cb));
++#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
++	skb_copy_stored_cb(new, old);
++#endif	
+ 	new->csum		= old->csum;
+ 	new->local_df		= old->local_df;
+ 	new->pkt_type		= old->pkt_type;
+@@ -2779,6 +2886,13 @@
+ 						0,
+ 						SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+ 						NULL);
++#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
++	skbuff_cb_store_cache = kmem_cache_create("skbuff_cb_store_cache",
++						  sizeof(struct skb_cb_table),
++						  0,
++						  SLAB_HWCACHE_ALIGN|SLAB_PANIC,
++						  NULL);
++#endif
+ }
+ 
+ /**
+diff -Naur linux-2.6.36/net/sched/act_police.c linux-2.6.36-new/net/sched/act_police.c
+--- linux-2.6.36/net/sched/act_police.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/net/sched/act_police.c	2011-09-04 11:07:53.000000000 -0700
+@@ -183,6 +183,11 @@
+ 		return -ENOMEM;
+ 	ret = ACT_P_CREATED;
+ 	police->tcf_refcnt = 1;
++#if 0
++#ifdef CONFIG_CS752X_HW_ACCELERATION
++	police->hw_pol_id = 0;
++#endif
++#endif
+ 	spin_lock_init(&police->tcf_lock);
+ 	if (bind)
+ 		police->tcf_bindcnt = 1;
+@@ -246,6 +251,52 @@
+ 	if (ret != ACT_P_CREATED)
+ 		return ret;
+ 
++#if 0	// disable for now
++#ifdef CONFIG_CS752X_HW_ACCELERATION
++#define TIME_UNITS_PER_SEC	1000000
++	if (police->hw_pol_id != 0) {
++		/* if HW policer has already been created and enabled for this SW 
++		 * Policer */
++		u32 cbs = 0, cir = 0, pbs = 0, pir = 0;
++
++		/* check if the updated SW policer can be applied to HW policer */
++		if ((police->tcfp_ewma_rate == 0) && (police->tcfp_R_tab != NULL) && 
++				(police->tcf_action == TC_ACT_SHOT)) {
++			/* update the HW policer */
++			cir = parm->rate.rate;
++			cbs = police->tcfp_burst * parm->rate.rate / TIME_UNITS_PER_SEC; 
++			if (police->tcfp_P_tab != NULL) {
++				pir = parm->peakrate.rate;
++				pbs = L2T_P(police, police->tcfp_mtu) / TIME_UNITS_PER_SEC * 
++					parm->peakrate.rate;
++			}
++			(* hw_jt.cs_qos_enbl_filter_policer)(&police->hw_pol_id, cir, 
++					cbs, pir, pbs);
++		} else {
++			/* disable the HW policer */
++			hw_jt.cs_qos_dsbl_filter_policer(police->hw_pol_id);
++			police->hw_pol_id = 0;
++		}
++	} else {
++		/* a new HW policer, check if this can be applied to HW policer */
++		u32 cbs = 0, cir = 0, pbs = 0, pir = 0;
++
++		if ((police->tcfp_ewma_rate == 0) && (police->tcfp_R_tab != NULL) && 
++				(police->tcf_action == TC_ACT_SHOT)) {
++			/* create the HW policer */
++			cir = parm->rate.rate;
++			cbs = police->tcfp_burst / TIME_UNITS_PER_SEC * parm->rate.rate;
++			if (police->tcfp_P_tab != NULL) {
++				pir = parm->peakrate.rate;
++				pbs = L2T_P(police, police->tcfp_mtu) / TIME_UNITS_PER_SEC * 
++					parm->peakrate.rate;
++			}
++			(* hw_jt.cs_qos_enbl_filter_policer)(&police->hw_pol_id, cir, cbs, 
++					pir, pbs);
++		}
++	}
++#endif
++#endif
+ 	police->tcfp_t_c = psched_get_time();
+ 	police->tcf_index = parm->index ? parm->index :
+ 		tcf_hash_new_index(&police_idx_gen, &police_hash_info);
+@@ -282,6 +333,14 @@
+ 		p->tcf_refcnt--;
+ 		if (p->tcf_refcnt <= 0 && !p->tcf_bindcnt) {
+ 			tcf_police_destroy(p);
++#if 0
++#ifdef CONFIG_CS752X_HW_ACCELERATION
++			if (p->hw_pol_id != 0) {
++				hw_jt.cs_qos_dsbl_filter_policer(p->hw_pol_id);
++				p->hw_pol_id = 0;
++			}
++#endif
++#endif
+ 			ret = 1;
+ 		}
+ 	}
+@@ -301,6 +360,14 @@
+ 	police->tcf_bstats.bytes += qdisc_pkt_len(skb);
+ 	police->tcf_bstats.packets++;
+ 
++#if 0
++#ifdef CONFIG_CS752X_HW_ACCELERATION
++	if (police->hw_pol_id != 0)
++		hw_jt.cs_qos_set_skb_pol_id(skb, police->hw_pol_id);
++	else hw_jt.cs_qos_set_skb_sw_only(skb);
++#endif
++#endif
++
+ 	if (police->tcfp_ewma_rate &&
+ 	    police->tcf_rate_est.bps >= police->tcfp_ewma_rate) {
+ 		police->tcf_qstats.overlimits++;

@@ -1,0 +1,25 @@
+--- linux-2.6.36/include/linux/cgroup.h~	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36/include/linux/cgroup.h	2011-09-02 16:46:24.475010073 -0700
+@@ -84,11 +84,14 @@
+ 	CSS_REMOVED, /* This CSS is dead */
+ };
+ 
++#if 0
+ /* Caller must verify that the css is not for root cgroup */
+ static inline void __css_get(struct cgroup_subsys_state *css, int count)
+ {
+ 	atomic_add(count, &css->refcnt);
+ }
++#endif
++extern void __css_get(struct cgroup_subsys_state *css, int count);
+ 
+ /*
+  * Call css_get() to hold a reference on the css; it can be used
+@@ -283,6 +286,7 @@
+ 
+ 	/* For RCU-protected deletion */
+ 	struct rcu_head rcu_head;
++        struct work_struct work;
+ };
+ 
+ /*

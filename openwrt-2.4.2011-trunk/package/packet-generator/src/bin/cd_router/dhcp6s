@@ -1,0 +1,8 @@
+config 'dhcp6s' 'basic'
+        option 'enabled' '1'                            # 1 = enabled; 0 = disab
+        option 'interface' 'lan'                        # This is the interface
+        option 'config_file' '/etc/dhcp6s.conf'         # Config file (as this U
+~
+~
+
+

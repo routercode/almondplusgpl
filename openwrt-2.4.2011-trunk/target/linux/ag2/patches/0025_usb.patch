@@ -1,0 +1,1074 @@
+diff -Naur linux-2.6.36-old/drivers/usb/gadget/Kconfig linux-2.6.36-new/drivers/usb/gadget/Kconfig
+--- linux-2.6.36-old/drivers/usb/gadget/Kconfig	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/gadget/Kconfig	2011-07-18 12:58:32.000000000 -0700
+@@ -270,6 +270,18 @@
+ 	default USB_GADGET
+ 	select USB_GADGET_SELECTED
+ 
++config USB_GADGET_SNPS_DWC_OTG
++        boolean "Synopsys Driver for DWC_otg Controller and Peripheral Driver"
++        select USB_GADGET_DUALSPEED
++        help
++           Selects the Synopsys Driver for the DWC_otg Controller and Device Driver.
++
++config USB_SNPS_DWC
++        tristate
++        depends on USB_GADGET_SNPS_DWC_OTG
++        default USB_GADGET
++        select USB_GADGET_SELECTED
++
+ config USB_GADGET_PXA27X
+ 	boolean "PXA 27x"
+ 	depends on ARCH_PXA && (PXA27x || PXA3xx)
+diff -Naur linux-2.6.36-old/drivers/usb/gadget/Makefile linux-2.6.36-new/drivers/usb/gadget/Makefile
+--- linux-2.6.36-old/drivers/usb/gadget/Makefile	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/gadget/Makefile	2011-07-18 09:12:24.000000000 -0700
+@@ -29,6 +29,10 @@
+ obj-$(CONFIG_USB_S3C_HSOTG)	+= s3c-hsotg.o
+ obj-$(CONFIG_USB_LANGWELL)	+= langwell_udc.o
+ 
++# cs752x OTG
++obj-$(CONFIG_USB_GADGET_SNPS_DWC_OTG)   += dwc_otg.o
++dwc_otg-objs := dwc_otg_cil.o dwc_otg_cil_intr.o dwc_otg_driver.o dwc_otg_pcd_intr.o dwc_otg_pcd.o dwc_otg_pcd_linux.o
++
+ #
+ # USB gadget drivers
+ #
+diff -Naur linux-2.6.36-old/drivers/usb/gadget/epautoconf.c linux-2.6.36-new/drivers/usb/gadget/epautoconf.c
+--- linux-2.6.36-old/drivers/usb/gadget/epautoconf.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/gadget/epautoconf.c	2011-07-18 13:00:39.000000000 -0700
+@@ -34,12 +34,12 @@
+ 
+ 
+ /* we must assign addresses for configurable endpoints (like net2280) */
+-static unsigned epnum;
++static __initdata unsigned epnum;
+ 
+ // #define MANY_ENDPOINTS
+ #ifdef MANY_ENDPOINTS
+ /* more than 15 configurable endpoints */
+-static unsigned in_epnum;
++static __initdata unsigned in_epnum;
+ #endif
+ 
+ 
+@@ -59,7 +59,7 @@
+  * NOTE:  each endpoint is unidirectional, as specified by its USB
+  * descriptor; and isn't specific to a configuration or altsetting.
+  */
+-static int
++static int __init
+ ep_matches (
+ 	struct usb_gadget		*gadget,
+ 	struct usb_ep			*ep,
+@@ -73,16 +73,16 @@
+ 	/* endpoint already claimed? */
+ 	if (NULL != ep->driver_data)
+ 		return 0;
+-
++//    printk("%s : in desc->bmAttributes %x \n",__func__,desc->bmAttributes);
+ 	/* only support ep0 for portable CONTROL traffic */
+ 	type = desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK;
+ 	if (USB_ENDPOINT_XFER_CONTROL == type)
+ 		return 0;
+-
++//    printk("%s-1 : in type %x ep->name[0] %s \n",__func__,type,ep->name[0]);
+ 	/* some other naming convention */
+ 	if ('e' != ep->name[0])
+ 		return 0;
+-
++//    printk("%s-2 : in type %x ep->name[2] %s \n",__func__,type,ep->name[2]);
+ 	/* type-restriction:  "-iso", "-bulk", or "-int".
+ 	 * direction-restriction:  "in", "out".
+ 	 */
+@@ -187,7 +187,7 @@
+ 	return 1;
+ }
+ 
+-static struct usb_ep *
++static struct usb_ep * __init
+ find_ep (struct usb_gadget *gadget, const char *name)
+ {
+ 	struct usb_ep	*ep;
+@@ -229,7 +229,7 @@
+  *
+  * On failure, this returns a null endpoint descriptor.
+  */
+-struct usb_ep *usb_ep_autoconfig (
++struct usb_ep * __init usb_ep_autoconfig (
+ 	struct usb_gadget		*gadget,
+ 	struct usb_endpoint_descriptor	*desc
+ )
+@@ -265,24 +265,16 @@
+ 				return ep;
+ 		}
+ 
+-#ifdef CONFIG_BLACKFIN
+-	} else if (gadget_is_musbhdrc(gadget)) {
+-		if ((USB_ENDPOINT_XFER_BULK == type) ||
+-		    (USB_ENDPOINT_XFER_ISOC == type)) {
+-			if (USB_DIR_IN & desc->bEndpointAddress)
+-				ep = find_ep (gadget, "ep5in");
+-			else
+-				ep = find_ep (gadget, "ep6out");
+-		} else if (USB_ENDPOINT_XFER_INT == type) {
+-			if (USB_DIR_IN & desc->bEndpointAddress)
+-				ep = find_ep(gadget, "ep1in");
+-			else
+-				ep = find_ep(gadget, "ep2out");
+-		} else
+-			ep = NULL;
++	} else if (gadget_is_sh (gadget) && USB_ENDPOINT_XFER_INT == type) {
++		/* single buffering is enough; maybe 8 byte fifo is too */
++		ep = find_ep (gadget, "ep3in-bulk");
++		if (ep && ep_matches (gadget, ep, desc))
++			return ep;
++
++	} else if (gadget_is_mq11xx (gadget) && USB_ENDPOINT_XFER_INT == type) {
++		ep = find_ep (gadget, "ep1-bulk");
+ 		if (ep && ep_matches (gadget, ep, desc))
+ 			return ep;
+-#endif
+ 	}
+ 
+ 	/* Second, look at endpoints until an unclaimed one looks usable */
+@@ -304,7 +296,7 @@
+  * state such as ep->driver_data and the record of assigned endpoints
+  * used by usb_ep_autoconfig().
+  */
+-void usb_ep_autoconfig_reset (struct usb_gadget *gadget)
++void __init usb_ep_autoconfig_reset (struct usb_gadget *gadget)
+ {
+ 	struct usb_ep	*ep;
+ 
+diff -Naur linux-2.6.36-old/drivers/usb/gadget/file_storage.c linux-2.6.36-new/drivers/usb/gadget/file_storage.c
+--- linux-2.6.36-old/drivers/usb/gadget/file_storage.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/gadget/file_storage.c	2011-07-18 13:00:47.000000000 -0700
+@@ -285,12 +285,19 @@
+ 
+ 
+ #include "storage_common.c"
+-
+-
++static const char longname[] = DRIVER_DESC;
++static const char shortname[] = DRIVER_NAME;
+ MODULE_DESCRIPTION(DRIVER_DESC);
+ MODULE_AUTHOR("Alan Stern");
+ MODULE_LICENSE("Dual BSD/GPL");
+ 
++#define FSG_VENDOR_ID	0x053f	// Synopsys
++#define FSG_PRODUCT_ID	0x0000	// Linux-USB File-backed Storage Gadget
++static const char EP_BULK_IN_NAME[] = "ep1in";
++static const char EP_BULK_OUT_NAME[] = "ep1out";
++static const char EP_INTR_IN_NAME[] = "ep3in";
++#define FS_BULK_OUT_MAXPACKET	64
++
+ /*
+  * This driver assumes self-powered hardware and has no way for users to
+  * trigger remote wakeup.  It uses autoconfiguration to select endpoints
+@@ -302,6 +309,11 @@
+ 
+ 
+ /* Encapsulate the module parameter settings */
++#define MAX_LUNS	8
++
++static char		*file[FSG_MAX_LUNS] = {"/mnt/tmpfs/ram.img",NULL, };//Bruce;;Modify
++static int		ro[FSG_MAX_LUNS] = {0,0, };//Bruce;;Modify
++static unsigned int luns =1;
+ 
+ static struct {
+ 	char		*file[FSG_MAX_LUNS];
+@@ -332,13 +344,13 @@
+ } mod_data = {					// Default values
+ 	.transport_parm		= "BBB",
+ 	.protocol_parm		= "SCSI",
+-	.removable		= 0,
+-	.can_stall		= 1,
++	.removable		= 1,
++	.can_stall		= 0,
+ 	.cdrom			= 0,
+ 	.vendor			= FSG_VENDOR_ID,
+ 	.product		= FSG_PRODUCT_ID,
+ 	.release		= 0xffff,	// Use controller chip type
+-	.buflen			= 16384,
++	.buflen			= 165535,
+ 	};
+ 
+ 
+@@ -541,6 +553,12 @@
+  * descriptors are built on demand.  Also the (static) config and interface
+  * descriptors are adjusted during fsg_bind().
+  */
++#define FSG_STRING_MANUFACTURER	1
++#define FSG_STRING_PRODUCT		2
++#define FSG_STRING_SERIAL		3
++#define FSG_STRING_CONFIG		4
++#define FSG_STRING_INTERFACE	5
++ 
+ 
+ /* There is only one configuration. */
+ #define	CONFIG_VALUE		1
+@@ -554,6 +572,7 @@
+ 	.bDeviceClass =		USB_CLASS_PER_INTERFACE,
+ 
+ 	/* The next three values can be overridden by module parameters */
++	.bMaxPacketSize0 = cpu_to_le16(0x40),
+ 	.idVendor =		cpu_to_le16(FSG_VENDOR_ID),
+ 	.idProduct =		cpu_to_le16(FSG_PRODUCT_ID),
+ 	.bcdDevice =		cpu_to_le16(0xffff),
+@@ -574,7 +593,8 @@
+ 	.bConfigurationValue =	CONFIG_VALUE,
+ 	.iConfiguration =	FSG_STRING_CONFIG,
+ 	.bmAttributes =		USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
+-	.bMaxPower =		CONFIG_USB_GADGET_VBUS_DRAW / 2,
++//	.bMaxPower =		CONFIG_USB_GADGET_VBUS_DRAW / 2,
++    .bMaxPower =		0,
+ };
+ 
+ 
+@@ -585,12 +605,157 @@
+ 
+ 	.bcdUSB =		cpu_to_le16(0x0200),
+ 	.bDeviceClass =		USB_CLASS_PER_INTERFACE,
+-
++  .bMaxPacketSize0 = __constant_cpu_to_le16(0x40),
+ 	.bNumConfigurations =	1,
+ };
+ 
++//Stone Add
++//==============================================================================
++static struct usb_otg_descriptor
++fsg_otg_desc = {
++	.bLength =		sizeof(fsg_otg_desc),
++	.bDescriptorType =	USB_DT_OTG,
+ 
++	.bmAttributes =		USB_OTG_SRP,
++};
+ 
++/* There is only one interface. */
++
++static struct usb_interface_descriptor
++fsg_intf_desc = {
++	.bLength =		sizeof fsg_intf_desc,
++	.bDescriptorType =	USB_DT_INTERFACE,
++
++	.bNumEndpoints =	2,		// Adjusted during fsg_bind()
++	.bInterfaceClass =	USB_CLASS_MASS_STORAGE,
++	.bInterfaceSubClass =	USB_SC_SCSI,	// Adjusted during fsg_bind()
++	.bInterfaceProtocol =	USB_PR_BULK,	// Adjusted during fsg_bind()
++	.iInterface =		FSG_STRING_INTERFACE,
++};
++
++/* Three full-speed endpoint descriptors: bulk-in, bulk-out,
++ * and interrupt-in. */
++
++static struct usb_endpoint_descriptor
++fsg_hs_bulk_in_desc = {
++	.bLength =		USB_DT_ENDPOINT_SIZE,
++	.bDescriptorType =	USB_DT_ENDPOINT,
++
++	/* bEndpointAddress copied from fs_bulk_in_desc during fsg_bind() */
++	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
++	.wMaxPacketSize =	cpu_to_le16(512),
++};
++
++static struct usb_endpoint_descriptor
++fsg_hs_bulk_out_desc = {
++	.bLength =		USB_DT_ENDPOINT_SIZE,
++	.bDescriptorType =	USB_DT_ENDPOINT,
++
++	/* bEndpointAddress copied from fs_bulk_out_desc during fsg_bind() */
++	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
++	.wMaxPacketSize =	cpu_to_le16(512),
++	.bInterval =		1,	// NAK every 1 uframe
++};
++
++static struct usb_endpoint_descriptor
++fsg_hs_intr_in_desc = {
++	.bLength =		USB_DT_ENDPOINT_SIZE,
++	.bDescriptorType =	USB_DT_ENDPOINT,
++
++	/* bEndpointAddress copied from fs_intr_in_desc during fsg_bind() */
++	.bmAttributes =		USB_ENDPOINT_XFER_INT,
++	.wMaxPacketSize =	cpu_to_le16(2),
++	.bInterval =		9,	// 2**(9-1) = 256 uframes -> 32 ms
++};
++
++static struct usb_endpoint_descriptor
++fsg_fs_bulk_in_desc = {
++	.bLength =		USB_DT_ENDPOINT_SIZE,
++	.bDescriptorType =	USB_DT_ENDPOINT,
++
++	.bEndpointAddress =	USB_DIR_IN | 1,
++	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
++	.wMaxPacketSize =	__constant_cpu_to_le16(0x40),
++	/* wMaxPacketSize set by autoconfiguration */
++};
++
++static struct usb_endpoint_descriptor
++fsg_fs_bulk_out_desc = {
++	.bLength =		USB_DT_ENDPOINT_SIZE,
++	.bDescriptorType =	USB_DT_ENDPOINT,
++
++	.bEndpointAddress =	1,
++	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
++	.wMaxPacketSize =	__constant_cpu_to_le16(64),
++	/* wMaxPacketSize set by autoconfiguration */
++};
++
++static struct usb_endpoint_descriptor
++fsg_fs_intr_in_desc = {
++	.bLength =		USB_DT_ENDPOINT_SIZE,
++	.bDescriptorType =	USB_DT_ENDPOINT,
++
++	.bEndpointAddress =	USB_DIR_IN | 3,
++	.bmAttributes =		USB_ENDPOINT_XFER_INT,
++	.wMaxPacketSize =	cpu_to_le16(2),
++	.bInterval =		32,	// frames -> 32 ms
++};
++
++static const struct usb_descriptor_header *fsg_fs_function[] = {
++	(struct usb_descriptor_header *) &fsg_otg_desc,
++	(struct usb_descriptor_header *) &fsg_intf_desc,
++	(struct usb_descriptor_header *) &fsg_fs_bulk_in_desc,
++	(struct usb_descriptor_header *) &fsg_fs_bulk_out_desc,
++	(struct usb_descriptor_header *) &fsg_fs_intr_in_desc,
++	NULL,
++};
++
++static const struct usb_descriptor_header *fsg_hs_function[] = {
++	(struct usb_descriptor_header *) &fsg_otg_desc,
++	(struct usb_descriptor_header *) &fsg_intf_desc,
++	(struct usb_descriptor_header *) &fsg_hs_bulk_in_desc,
++	(struct usb_descriptor_header *) &fsg_hs_bulk_out_desc,
++	(struct usb_descriptor_header *) &fsg_hs_intr_in_desc,
++	NULL,
++};
++#define FSG_HS_FUNCTION_PRE_EP_ENTRIES	2
++
++/* Maxpacket and other transfer characteristics vary by speed. */
++static struct usb_endpoint_descriptor *
++ep_desc(struct usb_gadget *g, struct usb_endpoint_descriptor *fs,
++		struct usb_endpoint_descriptor *hs)
++{
++	if (gadget_is_dualspeed(g) && g->speed == USB_SPEED_HIGH)
++		return hs;
++	return fs;
++}
++
++
++/* The CBI specification limits the serial string to 12 uppercase hexadecimal
++ * characters. */
++#define UTS_SYSNAME         "Synopsys"
++//static char				manufacturer[64];
++static char				serial[13];
++static const char sysname[]=UTS_SYSNAME;
++
++/* Static strings, in UTF-8 (for simplicity we use only ASCII characters) */
++static struct usb_string		strings[] = {
++//	{STRING_MANUFACTURER,	manufacturer},
++    {FSG_STRING_MANUFACTURER,	sysname},
++	{FSG_STRING_PRODUCT,	longname},
++	{FSG_STRING_SERIAL,		serial},
++//	{STRING_CONFIG,		"Self-powered"},
++//	{STRING_INTERFACE,	"Mass Storage"},
++	{}
++};
++
++static struct usb_gadget_strings	fsg_stringtab = {
++	.language	= 0x0409,		// en-us
++	.strings	= strings,
++};
++//==============================================================================
++
++#if 0
+ /*
+  * Config descriptors must agree with the code that sets configurations
+  * and with code managing interfaces and their altsettings.  They must
+@@ -620,8 +785,91 @@
+ 	((struct usb_config_descriptor *) buf)->bDescriptorType = type;
+ 	return len;
+ }
++#endif
++
++//Stone Add
++//==============================================================================
++static int populate_config_buf(struct usb_gadget *gadget,
++		u8 *buf0, u8 type, unsigned index)
++{
++	u8	*buf = buf0;
++#ifdef CONFIG_USB_GADGET_DUALSPEED
++	enum usb_device_speed			speed = gadget->speed = USB_SPEED_HIGH;
++	int	hs;
++#endif
++	int					len;
+ 
+ 
++	if (index > 0)
++		return -EINVAL;
++#if 0
++	const struct usb_descriptor_header	**function;
++#ifdef CONFIG_USB_GADGET_DUALSPEED
++	if (type == USB_DT_OTHER_SPEED_CONFIG)
++		speed = (USB_SPEED_FULL + USB_SPEED_HIGH) - speed;
++	if (speed == USB_SPEED_HIGH)
++		function = hs_function;
++	else
++#endif
++		function = fs_function;
++
++	/* for now, don't advertise srp-only devices */
++	if (!gadget->is_otg)
++		function++;
++
++	len = usb_gadget_config_buf(&config_desc, buf0, EP0_BUFSIZE, function);
++	((struct usb_config_descriptor *) buf)->bDescriptorType = type;
++	return len;
++#endif //if 0 end
++
++if (config_desc.wTotalLength  > EP0_BUFSIZE)
++		return -EDOM;
++//    printk("%s : config_desc.wTotalLength %x \n",__func__,config_desc.wTotalLength);
++	/* Config (or other speed config) */
++	memcpy(buf, &config_desc, USB_DT_CONFIG_SIZE);
++	buf[1] = type;
++	buf += USB_DT_CONFIG_SIZE;
++
++	/* Interface */
++	memcpy(buf, &fsg_intf_desc, USB_DT_INTERFACE_SIZE);
++	buf += USB_DT_INTERFACE_SIZE;
++
++	/* The endpoints in the interface (at that speed) */
++//#ifdef CONFIG_USB_GADGET_DUALSPEED
++	hs = (speed == USB_SPEED_HIGH);
++//	if (type == USB_DT_OTHER_SPEED_CONFIG)
++//		hs = !hs;
++	if (hs) {
++		memcpy(buf, &fsg_hs_bulk_in_desc, USB_DT_ENDPOINT_SIZE);
++		buf += USB_DT_ENDPOINT_SIZE;
++		memcpy(buf, &fsg_hs_bulk_out_desc, USB_DT_ENDPOINT_SIZE);
++		buf += USB_DT_ENDPOINT_SIZE;
++		if (transport_is_cbi()) {
++			memcpy(buf, &fsg_hs_intr_in_desc, USB_DT_ENDPOINT_SIZE);
++			buf += USB_DT_ENDPOINT_SIZE;
++		}
++	} else
++//#endif
++	{
++		memcpy(buf, &fsg_fs_bulk_in_desc, USB_DT_ENDPOINT_SIZE);
++		buf += USB_DT_ENDPOINT_SIZE;
++		memcpy(buf, &fsg_fs_bulk_out_desc, USB_DT_ENDPOINT_SIZE);
++		buf += USB_DT_ENDPOINT_SIZE;
++		if (transport_is_cbi()) {
++			memcpy(buf, &fsg_fs_intr_in_desc, USB_DT_ENDPOINT_SIZE);
++			buf += USB_DT_ENDPOINT_SIZE;
++		}
++	}
++
++//For OTG;;Start
++	memcpy(buf, &fsg_otg_desc, USB_DT_CONFIG_SIZE);
++	buf += 3;
++//For OTG;;end
++
++	return buf - buf0;
++}
++//===============================================================================
++
+ /*-------------------------------------------------------------------------*/
+ 
+ /* These routines may be called in process context or in_irq */
+@@ -933,6 +1181,7 @@
+ 		case USB_DT_DEVICE:
+ 			VDBG(fsg, "get device descriptor\n");
+ 			value = sizeof device_desc;
++			value = min(ctrl->wLength, (u16) sizeof device_desc);
+ 			memcpy(req->buf, &device_desc, value);
+ 			break;
+ 		case USB_DT_DEVICE_QUALIFIER:
+@@ -955,6 +1204,8 @@
+ 					req->buf,
+ 					w_value >> 8,
+ 					w_value & 0xff);
++			if (value >= 0)
++				value = min(ctrl->wLength, (u16) value);		
+ 			break;
+ 
+ 		case USB_DT_STRING:
+@@ -963,6 +1214,8 @@
+ 			/* wIndex == language code */
+ 			value = usb_gadget_get_string(&fsg_stringtab,
+ 					w_value & 0xff, req->buf);
++			if (value >= 0)
++				value = min(ctrl->wLength, (u16) value);		
+ 			break;
+ 		}
+ 		break;
+@@ -1037,6 +1290,7 @@
+ 	int			rc;
+ 	int			w_length = le16_to_cpu(ctrl->wLength);
+ 
++  fsg->ep0 = gadget->ep0;
+ 	++fsg->ep0_req_tag;		// Record arrival of a new request
+ 	fsg->ep0req->context = NULL;
+ 	fsg->ep0req->length = 0;
+@@ -2817,12 +3071,14 @@
+ 	/* Enable the endpoints */
+ 	d = fsg_ep_desc(fsg->gadget,
+ 			&fsg_fs_bulk_in_desc, &fsg_hs_bulk_in_desc);
++//	 printk("%s : bulk-in desc %x fsg->bulk_in %x \n",__func__,d, fsg->bulk_in);   		
+ 	if ((rc = enable_endpoint(fsg, fsg->bulk_in, d)) != 0)
+ 		goto reset;
+ 	fsg->bulk_in_enabled = 1;
+ 
+ 	d = fsg_ep_desc(fsg->gadget,
+ 			&fsg_fs_bulk_out_desc, &fsg_hs_bulk_out_desc);
++//	printk("%s : bulk-out desc %x fsg->bulk_out %x \n",__func__,d, fsg->bulk_out);		
+ 	if ((rc = enable_endpoint(fsg, fsg->bulk_out, d)) != 0)
+ 		goto reset;
+ 	fsg->bulk_out_enabled = 1;
+@@ -2832,6 +3088,7 @@
+ 	if (transport_is_cbi()) {
+ 		d = fsg_ep_desc(fsg->gadget,
+ 				&fsg_fs_intr_in_desc, &fsg_hs_intr_in_desc);
++		printk("%s : intr_in desc %x fsg->intr_in %x \n",__func__,d, fsg->intr_in);
+ 		if ((rc = enable_endpoint(fsg, fsg->intr_in, d)) != 0)
+ 			goto reset;
+ 		fsg->intr_in_enabled = 1;
+@@ -3232,6 +3489,14 @@
+ 		gcnum = usb_gadget_controller_number(fsg->gadget);
+ 		if (gcnum >= 0)
+ 			mod_data.release = 0x0300 + gcnum;
++//Stone add
++        else if (gadget_is_dwc_otg(fsg->gadget)) {
++			mod_data.release = __constant_cpu_to_le16 (0x0200);
++                        mod_data.vendor  = __constant_cpu_to_le16 (0x053f);
++                        if (mod_data.product == FSG_PRODUCT_ID) {
++                                mod_data.product  = __constant_cpu_to_le16 (0x0000);
++                        }
++                }  			
+ 		else {
+ 			WARNING(fsg, "controller '%s' not recognized\n",
+ 				fsg->gadget->name);
+@@ -3291,7 +3556,8 @@
+ 	}
+ 
+ #endif /* CONFIG_USB_FILE_STORAGE_TEST */
+-
++//Stone Add
++#if 0
+ 	/* Serial string handling.
+ 	 * On a real device, the serial string would be loaded
+ 	 * from permanent storage. */
+@@ -3342,7 +3608,7 @@
+ 			sprintf(&fsg_string_serial[i], "%02X", c);
+ 		}
+ 	}
+-
++#endif
+ 	return 0;
+ }
+ 
+@@ -3358,9 +3624,11 @@
+ 	char			*pathbuf, *p;
+ 
+ 	fsg->gadget = gadget;
++	fsg->gadget->dev = gadget->dev;
+ 	set_gadget_data(gadget, fsg);
+ 	fsg->ep0 = gadget->ep0;
+ 	fsg->ep0->driver_data = fsg;
++	gadget->speed = USB_SPEED_HIGH;
+ 
+ 	if ((rc = check_parameters(fsg)) != 0)
+ 		goto out;
+@@ -3410,7 +3678,8 @@
+ 		dev_set_drvdata(&curlun->dev, &fsg->filesem);
+ 		dev_set_name(&curlun->dev,"%s-lun%d",
+ 			     dev_name(&gadget->dev), i);
+-
++//Stone Add
++#if 0
+ 		if ((rc = device_register(&curlun->dev)) != 0) {
+ 			INFO(fsg, "failed to register LUN%d: %d\n", i, rc);
+ 			goto out;
+@@ -3426,10 +3695,11 @@
+ 		}
+ 		curlun->registered = 1;
+ 		kref_get(&fsg->ref);
++#endif
+ 
+-		if (mod_data.file[i] && *mod_data.file[i]) {
++		if (file[i] && *file[i]) {
+ 			if ((rc = fsg_lun_open(curlun,
+-					mod_data.file[i])) != 0)
++					file[i])) != 0)
+ 				goto out;
+ 		} else if (!mod_data.removable) {
+ 			ERROR(fsg, "no file given for LUN%d\n", i);
+@@ -3438,6 +3708,8 @@
+ 		}
+ 	}
+ 
++//Stone Add
++#if 0
+ 	/* Find all the endpoints we will use */
+ 	usb_ep_autoconfig_reset(gadget);
+ 	ep = usb_ep_autoconfig(gadget, &fsg_fs_bulk_in_desc);
+@@ -3471,6 +3743,65 @@
+ 	fsg_intf_desc.bInterfaceSubClass = mod_data.protocol_type;
+ 	fsg_intf_desc.bInterfaceProtocol = mod_data.transport_type;
+ 	fsg_fs_function[i + FSG_FS_FUNCTION_PRE_EP_ENTRIES] = NULL;
++//Stone add
++#endif	
++
++//Stone Add
++//==============================================================================
++i = (transport_is_cbi() ? 3 : 2);	// Number of endpoints
++	config_desc.wTotalLength = USB_DT_CONFIG_SIZE + USB_DT_INTERFACE_SIZE
++			+ USB_DT_ENDPOINT_SIZE * i;	
++//#if 0	
++//Add from Gemini file_storage.c
++//========================================== 	
++	//For OTG
++    
++    config_desc.wTotalLength +=3;
++
++//For OTG
++
++//    printk( "fsg_bind=>Find all the endpoints we will use \n");//Bruce
++printk("******gadget %x gadget->ep_list %x \n",gadget,gadget->ep_list);
++	/* Find all the endpoints we will use */
++	i=0;
++	gadget_for_each_ep(ep, gadget) {
++//	i++;
++    printk("%s : gadget_for_each_ep i %x ep->name=%s ep->name %x ep %x \n", __func__, i, ep->name,ep->name,ep);//Bruce
++    
++		if (strcmp(ep->name, EP_BULK_IN_NAME) == 0)
++			{
++             fsg->bulk_in = ep;
++             printk("fsg_bind=> Found BULK_IN ED \n");//Bruce
++			}
++		else if (strcmp(ep->name, EP_BULK_OUT_NAME) == 0)
++			{
++             fsg->bulk_out = ep;
++             printk("fsg_bind=> Found BULK_OUT ED \n");//Bruce
++			}
++		else if (strcmp(ep->name, EP_INTR_IN_NAME) == 0)
++			{
++             fsg->intr_in = ep;
++             printk("fsg_bind=> Found INTR_IN ED \n");//Bruce
++			}
++	i++;		
++	if (i>4)  //Bruce;;Modify
++	   break; //Bruce;;Modify	 
++	}
++	
++   printk("Check the ed type \n");//Bruce
++
++	if (!fsg->bulk_in || !fsg->bulk_out ||
++			(transport_is_cbi() && !fsg->intr_in)) {
++		printk("unable to find all endpoints\n");	
++		printk("fsg->bulk_in %x fsg->bulk_out %x fsg->intr_in %x \n",fsg->bulk_in,fsg->bulk_out,fsg->intr_in);
++		DBG(fsg, "unable to find all endpoints\n");
++		rc = -ENOTSUPP;
++		goto out;
++	}
++	fsg->bulk_out_maxpacket = (gadget->speed == USB_SPEED_HIGH ? 512 :
++			FS_BULK_OUT_MAXPACKET);
++//===============================================================================
++//==============================================================================
+ 
+ 	if (gadget_is_dualspeed(gadget)) {
+ 		fsg_hs_function[i + FSG_HS_FUNCTION_PRE_EP_ENTRIES] = NULL;
+@@ -3606,7 +3937,8 @@
+ #else
+ 	.speed		= USB_SPEED_FULL,
+ #endif
+-	.function	= (char *) fsg_string_product,
++//	.function	= (char *) fsg_string_product,
++  .function	= (char *) longname,
+ 	.bind		= fsg_bind,
+ 	.unbind		= fsg_unbind,
+ 	.disconnect	= fsg_disconnect,
+@@ -3615,7 +3947,8 @@
+ 	.resume		= fsg_resume,
+ 
+ 	.driver		= {
+-		.name		= DRIVER_NAME,
++//		.name		= DRIVER_NAME,
++    .name		= (char *) shortname,
+ 		.owner		= THIS_MODULE,
+ 		// .release = ...
+ 		// .suspend = ...
+diff -Naur linux-2.6.36-old/drivers/usb/gadget/gadget_chips.h linux-2.6.36-new/drivers/usb/gadget/gadget_chips.h
+--- linux-2.6.36-old/drivers/usb/gadget/gadget_chips.h	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/gadget/gadget_chips.h	2011-07-18 13:07:15.000000000 -0700
+@@ -45,18 +45,46 @@
+ #define	gadget_is_goku(g)	0
+ #endif
+ 
++/* SH3 UDC -- not yet ported 2.4 --> 2.6 */
++#ifdef CONFIG_USB_GADGET_SUPERH
++#define	gadget_is_sh(g)		!strcmp("sh_udc", (g)->name)
++#else
++#define	gadget_is_sh(g)		0
++#endif
++
++/* not yet stable on 2.6 (would help "original Zaurus") */
++#ifdef CONFIG_USB_GADGET_SA1100
++#define	gadget_is_sa1100(g)	!strcmp("sa1100_udc", (g)->name)
++#else
++#define	gadget_is_sa1100(g)	0
++#endif
++
+ #ifdef CONFIG_USB_GADGET_LH7A40X
+ #define	gadget_is_lh7a40x(g)	!strcmp("lh7a40x_udc", (g)->name)
+ #else
+ #define	gadget_is_lh7a40x(g)	0
+ #endif
+ 
++/* handhelds.org tree (?) */
++#ifdef CONFIG_USB_GADGET_MQ11XX
++#define	gadget_is_mq11xx(g)	!strcmp("mq11xx_udc", (g)->name)
++#else
++#define	gadget_is_mq11xx(g)	0
++#endif
++
+ #ifdef CONFIG_USB_GADGET_OMAP
+ #define	gadget_is_omap(g)	!strcmp("omap_udc", (g)->name)
+ #else
+ #define	gadget_is_omap(g)	0
+ #endif
+ 
++/* not yet ported 2.4 --> 2.6 */
++#ifdef CONFIG_USB_GADGET_N9604
++#define	gadget_is_n9604(g)	!strcmp("n9604_udc", (g)->name)
++#else
++#define	gadget_is_n9604(g)	0
++#endif
++
+ /* various unstable versions available */
+ #ifdef CONFIG_USB_GADGET_PXA27X
+ #define	gadget_is_pxa27x(g)	!strcmp("pxa27x_udc", (g)->name)
+@@ -94,6 +122,14 @@
+ #define gadget_is_fsl_usb2(g)	0
+ #endif
+ 
++/* Mentor high speed function controller */
++/* from Montavista kernel (?) */
++#ifdef CONFIG_USB_GADGET_MUSBHSFC
++#define gadget_is_musbhsfc(g)	!strcmp("musbhsfc_udc", (g)->name)
++#else
++#define gadget_is_musbhsfc(g)	0
++#endif
++
+ /* Mentor high speed "dual role" controller, in peripheral role */
+ #ifdef CONFIG_USB_GADGET_MUSB_HDRC
+ #define gadget_is_musbhdrc(g)	!strcmp("musb_hdrc", (g)->name)
+@@ -107,6 +143,13 @@
+ #define gadget_is_langwell(g)	0
+ #endif
+ 
++/* from Montavista kernel (?) */
++#ifdef CONFIG_USB_GADGET_MPC8272
++#define gadget_is_mpc8272(g)	!strcmp("mpc8272_udc", (g)->name)
++#else
++#define gadget_is_mpc8272(g)	0
++#endif
++
+ #ifdef CONFIG_USB_GADGET_M66592
+ #define	gadget_is_m66592(g)	!strcmp("m66592_udc", (g)->name)
+ #else
+@@ -136,10 +179,10 @@
+ #define	gadget_is_r8a66597(g)	0
+ #endif
+ 
+-#ifdef CONFIG_USB_S3C_HSOTG
+-#define gadget_is_s3c_hsotg(g)    (!strcmp("s3c-hsotg", (g)->name))
++#ifdef CONFIG_USB_GADGET_SNPS_DWC_OTG
++#define	gadget_is_dwc_otg(g)	!strcmp("dwc_otg_pcd", (g)->name)
+ #else
+-#define gadget_is_s3c_hsotg(g)    0
++#define	gadget_is_dwc_otg(g)	0
+ #endif
+ 
+ 
+@@ -166,12 +209,20 @@
+ 		return 0x02;
+ 	else if (gadget_is_pxa(gadget))
+ 		return 0x03;
++	else if (gadget_is_sh(gadget))
++		return 0x04;
++	else if (gadget_is_sa1100(gadget))
++		return 0x05;
+ 	else if (gadget_is_goku(gadget))
+ 		return 0x06;
++	else if (gadget_is_mq11xx(gadget))
++		return 0x07;
+ 	else if (gadget_is_omap(gadget))
+ 		return 0x08;
+ 	else if (gadget_is_lh7a40x(gadget))
+ 		return 0x09;
++	else if (gadget_is_n9604(gadget))
++		return 0x10;
+ 	else if (gadget_is_pxa27x(gadget))
+ 		return 0x11;
+ 	else if (gadget_is_s3c2410(gadget))
+@@ -180,8 +231,12 @@
+ 		return 0x13;
+ 	else if (gadget_is_imx(gadget))
+ 		return 0x14;
++	else if (gadget_is_musbhsfc(gadget))
++		return 0x15;
+ 	else if (gadget_is_musbhdrc(gadget))
+ 		return 0x16;
++	else if (gadget_is_mpc8272(gadget))
++		return 0x17;
+ 	else if (gadget_is_atmel_usba(gadget))
+ 		return 0x18;
+ 	else if (gadget_is_fsl_usb2(gadget))
+@@ -198,8 +253,6 @@
+ 		return 0x24;
+ 	else if (gadget_is_r8a66597(gadget))
+ 		return 0x25;
+-	else if (gadget_is_s3c_hsotg(gadget))
+-		return 0x26;
+ 	return -ENOENT;
+ }
+ 
+@@ -218,6 +271,10 @@
+ 	if (gadget_is_pxa27x(gadget))
+ 		return false;
+ 
++	/* SH3 hardware just doesn't do altsettings */
++	if (gadget_is_sh(gadget))
++		return false;
++
+ 	/* Everything else is *presumably* fine ... */
+ 	return true;
+ }
+diff -Naur linux-2.6.36-old/drivers/usb/gadget/storage_common.c linux-2.6.36-new/drivers/usb/gadget/storage_common.c
+--- linux-2.6.36-old/drivers/usb/gadget/storage_common.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/gadget/storage_common.c	2011-07-18 13:01:06.000000000 -0700
+@@ -376,7 +376,7 @@
+ 
+ 
+ /*-------------------------------------------------------------------------*/
+-
++#if 0
+ 
+ enum {
+ #ifndef FSG_NO_DEVICE_STRINGS
+@@ -536,15 +536,8 @@
+ 	NULL,
+ };
+ 
++
+ /* Maxpacket and other transfer characteristics vary by speed. */
+-static struct usb_endpoint_descriptor *
+-fsg_ep_desc(struct usb_gadget *g, struct usb_endpoint_descriptor *fs,
+-		struct usb_endpoint_descriptor *hs)
+-{
+-	if (gadget_is_dualspeed(g) && g->speed == USB_SPEED_HIGH)
+-		return hs;
+-	return fs;
+-}
+ 
+ 
+ /* Static strings, in UTF-8 (for simplicity we use only ASCII characters) */
+@@ -564,6 +557,17 @@
+ 	.strings	= fsg_strings,
+ };
+ 
++#endif
++
++static struct usb_endpoint_descriptor *
++fsg_ep_desc(struct usb_gadget *g, struct usb_endpoint_descriptor *fs,
++		struct usb_endpoint_descriptor *hs)
++{
++	if (gadget_is_dualspeed(g) && g->speed == USB_SPEED_HIGH)
++		return hs;
++	return fs;
++}
++
+ 
+  /*-------------------------------------------------------------------------*/
+ 
+diff -Naur linux-2.6.36-old/drivers/usb/host/ehci-hcd.c linux-2.6.36-new/drivers/usb/host/ehci-hcd.c
+--- linux-2.6.36-old/drivers/usb/host/ehci-hcd.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/host/ehci-hcd.c	2011-07-18 08:28:30.000000000 -0700
+@@ -63,8 +63,9 @@
+ #define DRIVER_AUTHOR "David Brownell"
+ #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
+ 
++#ifndef CONFIG_CORTINA_G2_USB_HOST
+ static const char	hcd_name [] = "ehci_hcd";
+-
++#endif
+ 
+ #undef VERBOSE_DEBUG
+ #undef EHCI_URB_TRACE
+@@ -1137,10 +1138,13 @@
+ MODULE_AUTHOR (DRIVER_AUTHOR);
+ MODULE_LICENSE ("GPL");
+ 
++//Add for Cortina USB driver  by stone.
++#ifndef CONFIG_CORTINA_G2_USB_HOST
+ #ifdef CONFIG_PCI
+ #include "ehci-pci.c"
+ #define	PCI_DRIVER		ehci_pci_driver
+ #endif
++#endif
+ 
+ #ifdef CONFIG_USB_EHCI_FSL
+ #include "ehci-fsl.c"
+@@ -1187,6 +1191,11 @@
+ #define	PLATFORM_DRIVER		ixp4xx_ehci_driver
+ #endif
+ 
++#ifdef CONFIG_CORTINA_G2_USB_HOST
++#include "ehci-cs752x.c"
++#define	PLATFORM_DRIVER		cs752x_ehci_driver
++#endif
++
+ #ifdef CONFIG_USB_W90X900_EHCI
+ #include "ehci-w90x900.c"
+ #define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
+diff -Naur linux-2.6.36-old/drivers/usb/host/ehci-hub.c linux-2.6.36-new/drivers/usb/host/ehci-hub.c
+--- linux-2.6.36-old/drivers/usb/host/ehci-hub.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/host/ehci-hub.c	2011-07-18 08:28:30.000000000 -0700
+@@ -489,7 +489,10 @@
+ 					== 0)
+ 			try = 0;
+ 		else {
++//debug_Aaron on 04/18/2011, fast plug in/out cause switch to OHCI
++#ifndef CONFIG_CORTINA_FPGA
+ 			port_status ^= PORT_OWNER;
++#endif
+ 			port_status &= ~(PORT_PE | PORT_RWC_BITS);
+ 			ehci_writel(ehci, port_status, status_reg);
+ 		}
+@@ -576,7 +579,10 @@
+ 			index + 1);
+ 
+ 		// what happens if HCS_N_CC(params) == 0 ?
++//debug_Aaron on 04/18/2011, fast plug in/out cause switch to OHCI
++#ifndef CONFIG_CORTINA_FPGA
+ 		port_status |= PORT_OWNER;
++#endif
+ 		port_status &= ~PORT_RWC_BITS;
+ 		ehci_writel(ehci, port_status, status_reg);
+ 
+diff -Naur linux-2.6.36-old/drivers/usb/host/ohci-hcd.c linux-2.6.36-new/drivers/usb/host/ohci-hcd.c
+--- linux-2.6.36-old/drivers/usb/host/ohci-hcd.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/host/ohci-hcd.c	2011-07-18 08:28:30.000000000 -0700
+@@ -70,7 +70,11 @@
+ 
+ /*-------------------------------------------------------------------------*/
+ 
++#ifdef CONFIG_CORTINA_G2_USB_HOST
++static const char	hcd_name [] = "cs752x_ohci";
++#else
+ static const char	hcd_name [] = "ohci_hcd";
++#endif
+ 
+ #define	STATECHANGE_DELAY	msecs_to_jiffies(300)
+ 
+@@ -85,6 +89,7 @@
+ #endif
+ 
+ #ifdef CONFIG_PCI
++#ifndef CONFIG_CORTINA_G2_USB_HOST
+ static void quirk_amd_pll(int state);
+ static void amd_iso_dev_put(void);
+ static void sb800_prefetch(struct ohci_hcd *ohci, int on);
+@@ -102,6 +107,20 @@
+ 	return;
+ }
+ #endif
++#else
++static inline void quirk_amd_pll(int state)
++{
++	return;
++}
++static inline void amd_iso_dev_put(void)
++{
++	return;
++}
++static inline void sb800_prefetch(struct ohci_hcd *ohci, int on)
++{
++	return;
++}
++#endif
+ 
+ 
+ #include "ohci-hub.c"
+@@ -991,10 +1010,12 @@
+ MODULE_DESCRIPTION(DRIVER_DESC);
+ MODULE_LICENSE ("GPL");
+ 
++#ifndef CONFIG_CORTINA_G2_USB_HOST
+ #ifdef CONFIG_PCI
+ #include "ohci-pci.c"
+ #define PCI_DRIVER		ohci_pci_driver
+ #endif
++#endif
+ 
+ #if defined(CONFIG_ARCH_SA1100) && defined(CONFIG_SA1111)
+ #include "ohci-sa1111.c"
+@@ -1006,6 +1027,11 @@
+ #define PLATFORM_DRIVER		ohci_hcd_s3c2410_driver
+ #endif
+ 
++#if defined CONFIG_CORTINA_G2_USB_HOST
++#include "ohci-cs752x.c"
++#define PLATFORM_DRIVER		ohci_hcd_cs752x_driver
++#endif
++
+ #ifdef CONFIG_USB_OHCI_HCD_OMAP1
+ #include "ohci-omap.c"
+ #define OMAP1_PLATFORM_DRIVER	ohci_hcd_omap_driver
+diff -Naur linux-2.6.36-old/drivers/usb/host/xhci-pci.c linux-2.6.36-new/drivers/usb/host/xhci-pci.c
+--- linux-2.6.36-old/drivers/usb/host/xhci-pci.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/host/xhci-pci.c	2011-07-18 08:28:30.000000000 -0700
+@@ -176,12 +176,25 @@
+ };
+ MODULE_DEVICE_TABLE(pci, pci_ids);
+ 
++int xhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
++{
++        int ret;
++        ret = usb_hcd_pci_probe(dev, id);
++
++        //debug_Aaron on 04/11/2011, for G2 FPGA board
++        pcie_set_readrq(dev, 512);
++        return ret;
++}
++
+ /* pci driver glue; this is a "new style" PCI driver module */
+ static struct pci_driver xhci_pci_driver = {
+ 	.name =		(char *) hcd_name,
+ 	.id_table =	pci_ids,
+ 
+-	.probe =	usb_hcd_pci_probe,
++	//debug_Aaron on 04/11/2011, for G2 FPGA board
++	//.probe =	usb_hcd_pci_probe,
++	.probe =	xhci_pci_probe,
++
+ 	.remove =	usb_hcd_pci_remove,
+ 	/* suspend and resume implemented later */
+ 
+diff -Naur linux-2.6.36-old/drivers/usb/host/xhci.c linux-2.6.36-new/drivers/usb/host/xhci.c
+--- linux-2.6.36-old/drivers/usb/host/xhci.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/usb/host/xhci.c	2011-07-18 08:28:30.000000000 -0700
+@@ -408,8 +408,11 @@
+ 		free_irq(hcd->irq, hcd);
+ 	hcd->irq = -1;
+ 
++//debug_Aaron on 04/19/20011, because our PCIe USB 3.0 card does not support MSI
++#if 0
+ 	ret = xhci_setup_msix(xhci);
+ 	if (ret)
++#endif
+ 		/* fall back to msi*/
+ 		ret = xhci_setup_msi(xhci);
+ 

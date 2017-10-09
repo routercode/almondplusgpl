@@ -1,0 +1,255 @@
+diff -Naur linux-2.6.36/drivers/media/dvb/dvb-core/dmxdev.c linux-2.6.36-new/drivers/media/dvb/dvb-core/dmxdev.c
+--- linux-2.6.36/drivers/media/dvb/dvb-core/dmxdev.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/media/dvb/dvb-core/dmxdev.c	2011-09-04 11:08:21.000000000 -0700
+@@ -40,6 +40,7 @@
+ 
+ #define dprintk	if (debug) printk
+ 
++
+ static int dvb_dmxdev_buffer_write(struct dvb_ringbuffer *buf,
+ 				   const u8 *src, size_t len)
+ {
+@@ -265,9 +266,9 @@
+ 	dprintk("function : %s\n", __func__);
+ 
+ 	if (buf->size == size)
+-		return 0;
+-	if (!size)
+-		return -EINVAL;
++                return 0;
++        if (!size)
++                return -EINVAL;
+ 
+ 	newmem = vmalloc(size);
+ 	if (!newmem)
+@@ -303,12 +304,25 @@
+ 	void *newmem;
+ 	void *oldmem;
+ 
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++        unsigned int    id;
++
++        id = dmxdevfilter->dev->dvbdev->id;	/* get device ID */
++        
++        buf->type = 1; 	/* need to get packet type from driver layer. */
++
++        if (buf->size == size)
++                return 0;
++        if (!size)
++                return -EINVAL;
++#else
+ 	if (buf->size == size)
+ 		return 0;
+ 	if (!size)
+ 		return -EINVAL;
+ 	if (dmxdevfilter->state >= DMXDEV_STATE_GO)
+ 		return -EBUSY;
++#endif
+ 
+ 	newmem = vmalloc(size);
+ 	if (!newmem)
+@@ -666,6 +680,10 @@
+ 			ret = dmxdev->demux->allocate_section_feed(dmxdev->demux,
+ 								   secfeed,
+ 								   dvb_dmxdev_section_callback);
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++			/* vincent add 	*/
++			(*secfeed)->priv = filter;
++#endif
+ 			if (ret < 0) {
+ 				printk("DVB (%s): could not alloc feed\n",
+ 				       __func__);
+diff -Naur linux-2.6.36/drivers/media/dvb/dvb-core/dvb_demux.c linux-2.6.36-new/drivers/media/dvb/dvb-core/dvb_demux.c
+--- linux-2.6.36/drivers/media/dvb/dvb-core/dvb_demux.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/media/dvb/dvb-core/dvb_demux.c	2011-09-04 11:08:21.000000000 -0700
+@@ -34,6 +34,10 @@
+ 
+ #include "dvb_demux.h"
+ 
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++#include "dmxdev.h"
++#endif
++
+ #define NOBUFS
+ /*
+ ** #define DVB_DEMUX_SECTION_LOSS_LOG to monitor payload loss in the syslog
+@@ -359,11 +363,15 @@
+ 		if (!feed->feed.ts.is_filtering)
+ 			break;
+ 		if (feed->ts_type & TS_PACKET) {
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++ 			feed->cb.ts(buf, feed->buffer_size, NULL, 0, &feed->feed.ts, DMX_OK);
++#else
+ 			if (feed->ts_type & TS_PAYLOAD_ONLY)
+ 				dvb_dmx_swfilter_payload(feed, buf);
+ 			else
+ 				feed->cb.ts(buf, 188, NULL, 0, &feed->feed.ts,
+ 					    DMX_OK);
++#endif                          
+ 		}
+ 		if (feed->ts_type & TS_DECODER)
+ 			if (feed->demux->write_to_decoder)
+@@ -392,6 +400,10 @@
+ 	struct dvb_demux_feed *feed;
+ 	u16 pid = ts_pid(buf);
+ 	int dvr_done = 0;
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++	struct dmxdev_filter 	*dmxdevfilter;
++        unsigned int    	id;
++#endif
+ 
+ 	if (dvb_demux_speedcheck) {
+ 		struct timespec cur_time, delta_time;
+@@ -447,18 +459,31 @@
+ 	};
+ 
+ 	list_for_each_entry(feed, &demux->feed_list, list_head) {
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++		dmxdevfilter = (struct dmxdev_filter *)(feed->feed.ts.priv);
++		id = dmxdevfilter->dev->dvbdev->id;
++#else
+ 		if ((feed->pid != pid) && (feed->pid != 0x2000))
+ 			continue;
+-
++#endif
+ 		/* copy each packet only once to the dvr device, even
+ 		 * if a PID is in multiple filters (e.g. video + PCR) */
+ 		if ((DVR_FEED(feed)) && (dvr_done++))
+ 			continue;
+ 
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++		if (demux->playing != id) {//Amos
++			continue;
++		}
++
++		feed->buffer_size = demux->feednum;
++		dvb_dmx_swfilter_packet_type(feed, buf);
++#else
+ 		if (feed->pid == pid)
+ 			dvb_dmx_swfilter_packet_type(feed, buf);
+ 		else if (feed->pid == 0x2000)
+ 			feed->cb.ts(buf, 188, NULL, 0, &feed->feed.ts, DMX_OK);
++#endif
+ 	}
+ }
+ 
+@@ -467,12 +492,21 @@
+ {
+ 	spin_lock(&demux->lock);
+ 
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++	if (buf[0] == 0x47) {
++		demux->feednum = count;
++/*              printk("%s=>demux=%x demux->feednum=%d rxq id=%d\n",
++			__func__,demux,demux->feednum,demux->playing);
++*/
++		dvb_dmx_swfilter_packet(demux, buf);
++	}
++#else
+ 	while (count--) {
+ 		if (buf[0] == 0x47)
+ 			dvb_dmx_swfilter_packet(demux, buf);
+ 		buf += 188;
+ 	}
+-
++#endif
+ 	spin_unlock(&demux->lock);
+ }
+ 
+diff -Naur linux-2.6.36/drivers/media/dvb/dvb-core/dvb_demux.h linux-2.6.36-new/drivers/media/dvb/dvb-core/dvb_demux.h
+--- linux-2.6.36/drivers/media/dvb/dvb-core/dvb_demux.h	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/media/dvb/dvb-core/dvb_demux.h	2011-09-04 11:08:21.000000000 -0700
+@@ -113,7 +113,11 @@
+ 			 const u8 *src, size_t len);
+ 
+ 	int users;
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++#define MAX_DVB_DEMUX_USERS 12 
++#else
+ #define MAX_DVB_DEMUX_USERS 10
++#endif
+ 	struct dvb_demux_filter *filter;
+ 	struct dvb_demux_feed *feed;
+ 
+diff -Naur linux-2.6.36/drivers/media/dvb/dvb-core/dvb_ringbuffer.c linux-2.6.36-new/drivers/media/dvb/dvb-core/dvb_ringbuffer.c
+--- linux-2.6.36/drivers/media/dvb/dvb-core/dvb_ringbuffer.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/media/dvb/dvb-core/dvb_ringbuffer.c	2011-09-04 11:08:21.000000000 -0700
+@@ -113,6 +113,9 @@
+ 	size_t todo = len;
+ 	size_t split;
+ 
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++if (rbuf->type){ /* Amos: copy control packet to user space */
++#endif
+ 	split = (rbuf->pread + len > rbuf->size) ? rbuf->size - rbuf->pread : 0;
+ 	if (split > 0) {
+ 		if (copy_to_user(buf, rbuf->data+rbuf->pread, split))
+@@ -125,7 +128,15 @@
+ 		return -EFAULT;
+ 
+ 	rbuf->pread = (rbuf->pread + todo) % rbuf->size;
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++} else {
++        /*printk("%s : buffer pointer = %x \n",__func__,(unsigned int)&rbuf->data);*/
++        if (copy_to_user(buf, (u8 *)&rbuf->data, 4))
++                return -EFAULT;
+ 
++        rbuf->pread = (rbuf->pread + todo) % rbuf->size;
++}
++#endif
+ 	return len;
+ }
+ 
+@@ -152,6 +163,9 @@
+ 	size_t todo = len;
+ 	size_t split;
+ 
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++if (rbuf->type) { /* Amos: copy control packet to user space */
++#endif
+ 	split = (rbuf->pwrite + len > rbuf->size) ? rbuf->size - rbuf->pwrite : 0;
+ 
+ 	if (split > 0) {
+@@ -163,6 +177,13 @@
+ 	memcpy(rbuf->data+rbuf->pwrite, buf, todo);
+ 	rbuf->pwrite = (rbuf->pwrite + todo) % rbuf->size;
+ 
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++} else { /* Amos */
++        rbuf->data = (u8 *)buf; /* Amos: pass buffer pointer only */
++        printk("%s : buffer pointer = %x \n",__func__,(unsigned int)&rbuf->data);
++        rbuf->pwrite = (rbuf->pwrite + todo) % rbuf->size;
++}
++#endif
+ 	return len;
+ }
+ 
+diff -Naur linux-2.6.36/drivers/media/dvb/dvb-core/dvb_ringbuffer.h linux-2.6.36-new/drivers/media/dvb/dvb-core/dvb_ringbuffer.h
+--- linux-2.6.36/drivers/media/dvb/dvb-core/dvb_ringbuffer.h	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/media/dvb/dvb-core/dvb_ringbuffer.h	2011-09-04 11:08:21.000000000 -0700
+@@ -37,6 +37,10 @@
+ 	ssize_t           pwrite;
+ 	int               error;
+ 
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++	unsigned char     qid;  /* Amos: RXQ ID (0-12) */
++	unsigned char     type; /* Amos: 0-data 1-control */
++#endif
+ 	wait_queue_head_t queue;
+ 	spinlock_t        lock;
+ };
+diff -Naur linux-2.6.36/drivers/media/dvb/dvb-core/dvbdev.c linux-2.6.36-new/drivers/media/dvb/dvb-core/dvbdev.c
+--- linux-2.6.36/drivers/media/dvb/dvb-core/dvbdev.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/drivers/media/dvb/dvb-core/dvbdev.c	2011-09-04 11:08:21.000000000 -0700
+@@ -54,7 +54,11 @@
+ #define MAX_DVB_MINORS		256
+ #define DVB_MAX_IDS		MAX_DVB_MINORS
+ #else
++#if defined(CONFIG_DVB_CS75XX_TS) || defined(CONFIG_DVB_CS75XX_TS_MODULE)
++#define DVB_MAX_IDS             12
++#else
+ #define DVB_MAX_IDS		4
++#endif
+ #define nums2minor(num,type,id)	((num << 6) | (id << 4) | type)
+ #define MAX_DVB_MINORS		(DVB_MAX_ADAPTERS*64)
+ #endif

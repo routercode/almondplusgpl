@@ -1,0 +1,87 @@
+menu "Configuration"
+     depends on PACKAGE_kmod-g2-mtd-nand
+
+config KERNEL_FTL
+        tristate "FTL (Flash Translation Layer) support"
+        default n
+        ---help---
+          This provides support for the original Flash Translation Layer which
+          is part of the PCMCIA specification. It uses a kind of pseudo-
+          file system on a flash device to emulate a block device with
+          512-byte sectors, on top of which you put a 'normal' file system.
+
+          You may find that the algorithms used in this code are patented
+          unless you live in the Free World where software patents aren't
+          legal - in the USA you are only permitted to use this on PCMCIA
+          hardware, although under the terms of the GPL you're obviously
+          permitted to copy, modify and distribute the code as you wish. Just
+          not use it.
+
+choice
+        prompt "G2 Hardware ECC Mode"
+        default KERNEL_CS752X_NAND_ECC_HW_HAMMING_256
+        help
+          This option enables the error correction provides hardware
+
+config KERNEL_CS752X_NAND_ECC_HW_HAMMING_256
+        bool "NAND Flash HW Hamming ECC (256) on Cortina board"
+        help
+          This enables the driver for the Cortina board to 
+          access the nand device with Hamming ecc.
+          This option tolerates 1 bit error in 256 data
+
+config KERNEL_CS752X_NAND_ECC_HW_HAMMING_512
+        bool "NAND Flash HW Hamming ECC (512) on Cortina board"
+        help
+          This enables the driver for the Cortina board to 
+          access the nand device with Hamming ecc.
+          This option tolerates 1 bit error in 512 data
+
+config KERNEL_CS752X_NAND_ECC_HW_BCH_8_512
+        bool "NAND Flash HW BCH ECC (8/512) on Cortina board"
+        help
+          This enables the driver for the Cortina board to 
+          access the nand device with BCH ecc. This option 
+          tolerates 8 bit error in 512 data
+
+config KERNEL_CS752X_NAND_ECC_HW_BCH_12_512
+        bool "NAND Flash HW BCH ECC (12/512) on Cortina board"
+        help
+          This enables the driver for the Cortina board to 
+          access the nand device with BCH ecc. This option 
+          tolerates 12 bit error in 512 data
+
+endchoice
+
+menu "Self-contained MTD device drivers"
+
+config KERNEL_MTDRAM_TOTAL_SIZE
+        int "MTDRAM device size in KiB"
+        default "4096"
+        help
+          This allows you to configure the total size of the MTD device
+          emulated by the MTDRAM driver.  If the MTDRAM driver is built
+          as a module, it is also possible to specify this as a parameter when
+          loading the module.
+
+config KERNEL_MTDRAM_ERASE_SIZE
+        int "MTDRAM erase block size in KiB"
+        default "128"
+        help
+          This allows you to configure the size of the erase blocks in the
+          device emulated by the MTDRAM driver.  If the MTDRAM driver is built
+          as a module, it is also possible to specify this as a parameter when
+          loading the module.
+
+config KERNEL_MTDRAM_ABS_POS
+        hex "SRAM Hexadecimal Absolute position or 0"
+        default "0"
+        help
+          If you have system RAM accessible by the CPU but not used by Linux
+          in normal operation, you can give the physical address at which the
+          available RAM starts, and the MTDRAM driver will use it instead of
+          allocating space from Linux's available memory. Otherwise, leave
+          this set to zero. Most people will want to leave this as zero.
+
+endmenu
+endmenu

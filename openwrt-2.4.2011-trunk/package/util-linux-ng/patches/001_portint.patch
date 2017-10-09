@@ -1,0 +1,49 @@
+--- util-linux-2.21.orig/configure	2012-02-24 19:03:15.000000000 +0800
++++ util-linux-2.21/configure	2012-05-16 16:48:10.000000000 +0800
+@@ -15747,7 +15747,7 @@
+   if test "$cross_compiling" = yes; then :
+   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
++echo $? "cannot run test program while cross compiling
+ See \`config.log' for more details" "$LINENO" 5; }
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+@@ -15801,7 +15801,7 @@
+ 	  if test "$cross_compiling" = yes; then :
+   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
++echo $? "cannot run test program while cross compiling
+ See \`config.log' for more details" "$LINENO" 5; }
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+@@ -15870,7 +15870,7 @@
+   if test "$cross_compiling" = yes; then :
+   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
++echo $? "cannot run test program while cross compiling
+ See \`config.log' for more details" "$LINENO" 5; }
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+@@ -15892,7 +15892,7 @@
+   if test "$cross_compiling" = yes; then :
+   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
++echo $? "cannot run test program while cross compiling
+ See \`config.log' for more details" "$LINENO" 5; }
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+--- util-linux-2.21.orig/libblkid/src/blkidP.h	2012-06-01 13:11:31.204134280 +0000
++++ util-linux-2.21/libblkid/src/blkidP.h	2012-06-01 13:12:08.911893832 +0000
+@@ -290,7 +290,7 @@
+ #define BLKID_CONFIG_FILE	"/etc/blkid.conf"
+ 
+ /* cache file on systemds with /run */
+-#define BLKID_RUNTIME_TOPDIR	"/run"
++#define BLKID_RUNTIME_TOPDIR	"/var/cache"
+ #define BLKID_RUNTIME_DIR	BLKID_RUNTIME_TOPDIR "/blkid"
+ #define BLKID_CACHE_FILE	BLKID_RUNTIME_DIR "/blkid.tab"
+ 

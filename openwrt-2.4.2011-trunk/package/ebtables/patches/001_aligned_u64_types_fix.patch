@@ -1,0 +1,8 @@
+--- a/include/linux/types.h
++++ b/include/linux/types.h
+@@ -206,4 +206,5 @@ struct ustat {
+ 
+ #endif	/* __KERNEL__ */
+ #endif /*  __ASSEMBLY__ */
++#define __aligned_u64 __u64 __attribute__((aligned(8)))
+ #endif /* _LINUX_TYPES_H */

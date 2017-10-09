@@ -1,0 +1,53 @@
+menu "CS75XX SPDIF module support"
+     depends on ARCH_GOLDENGATE
+
+config SOUND_CS75XX_SPDIF
+       tristate "Enable SPDIF sound support"
+       select SOUND
+       select SOUND_PRIME
+       help
+	 OSS sound driver for CS752X
+
+config SOUND_DAC_SSP
+      tristate "DAC with CS75XX SSP"
+      depends on SOUND_CS75XX_SPDIF
+      help
+        Answer Y if you have DAC with with Cortina CS75XX SSP(I2S) module
+        support.
+
+choice
+      prompt "DAC Reference Clock Selection"
+      default DAC_REF_EXTERNAL_CLK
+      depends on SOUND_DAC_SSP
+      help
+        Select the clock source.
+
+      config DAC_REF_EXTERNAL_CLK
+              bool "external clock"
+
+      config DAC_REF_INTERNAL_CLK
+              bool "internal clock"
+endchoice
+
+config SOUND_D2_45057
+      tristate "D2-45057"
+      depends on SOUND_PRIME!=n && SOUND!=n && ARCH_GOLDENGATE && CORTINA_ENGINEERING
+      help
+        Answer Y if you have D2-45057 with with Cortina CS75XX SPDIF module
+        support.
+
+choice
+      prompt "D2-45057 Data Path Selection"
+      default SOUND_D2_45057_SPDIF
+      depends on SOUND_D2_45057
+      help
+        Select D2-45057 data path.
+
+      config SOUND_D2_45057_SPDIF
+              bool "CS75XX-SPDIF"
+
+      config SOUND_D2_45057_SSP
+              bool "CS75XX-SSP"
+endchoice
+
+endmenu

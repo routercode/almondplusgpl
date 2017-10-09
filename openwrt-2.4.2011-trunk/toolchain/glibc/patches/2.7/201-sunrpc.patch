@@ -1,0 +1,15 @@
+--- glibc-2.7/sunrpc/rpc_svcout.c.orig	2012-10-15 13:37:27.190241108 -0700
++++ glibc-2.7/sunrpc/rpc_svcout.c	2012-10-15 14:50:17.810298043 -0700
+@@ -737,8 +737,11 @@
+ 	  for (vp = def->def.pr.versions; vp != NULL;
+ 	       vp = vp->next)
+ 	    {
++	      const char *stra = (const char *)(vp->vers_name);
++	      char *str = strdup( stra );
+ 	      f_print (fout, "%spmap_unset (%s, %s);\n",
+-		       space, def->def_name, vp->vers_name);
++		       space, def->def_name, str);
++	      free(str);
+ 	    }
+ 	}
+     }

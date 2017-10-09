@@ -1,0 +1,6 @@
+config system
+	option hostname	MythTV
+	option timezone	PDT
+
+config rdate
+	option interface	wan

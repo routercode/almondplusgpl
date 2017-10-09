@@ -1,0 +1,1058 @@
+;09-Feb-2009
+;This script is intended for running on a PBX-A9 Platform, trace on Core_0.
+
+
+;*********************
+;JTAG DEBUGGER SET UP
+;*********************
+;Open CPU system window
+res
+;SYSTEM
+SYSTEM.RESET
+SYSTEM.OPTION ENRESET OFF
+SYSTEM.CPU CortexA9MPCoreSMP2
+;by default the JTAG clock is set to 10Mhz
+;SYSTEM.JTAGCLOCK
+
+;**********************
+;CORESIGHT SYSTEM SETUP
+;***********************
+;JTAG SCAN CHAIN DIAGNOSIS: If you get IR_Width = 4 (ARM7, ARM9, Cortex) or IR_Width = 5 (ARM11)
+;DIAG 3400
+;Read ROM Table
+;AREA
+;DIAG 3411
+
+;R-T Memory Access
+SYSTEM.MULTICORE MEMORYACCESSPORT 0
+SYSTEM.MULTICORE DEBUGACCESSPORT 1
+;SYStem.MultiCore JTAGACCESSPORT 2
+;Setting Core debug register access
+;SYSTEM.MULTICORE COREBASE APB:0x80110000
+;SYSTEM.MULTICORE COREBASE APB:0x80112000
+;SYSTEM.MULTICORE COREBASE APB:0x80114000
+;SYSTEM.MULTICORE COREBASE APB:0x80116000
+;SYSTEM.MULTICORE COREBASE APB:0x80112000
+SYS.CONFIG DEBUGBASE DAP:0x80110000 DAP:0x80112000 DAP:0x80114000 DAP:0x80116000
+sys.up
+;end
+
+
+;Setting PTM
+SYSTEM.MULTICORE ETMBASE APB:0x8011C000
+
+;Setting ETB
+SYSTEM.MULTICORE ETBBASE APB:0x80001000
+
+;Setting TPIU
+SYSTEM.MULTICORE TPIUBASE APB:0x80003000
+
+;Setting Funnel
+SYSTEM.MULTICORE FUNNELBASE APB:0x80004000
+SYSTEM.MULTICORE ETMFUNNELPORT 0
+
+;To activate external trace via TPIU instead into the ETB you need to set, but it is the default if there is an ETM Preprocessor connected
+;Trace.Method Analyzer
+;To activate the ETB
+;Trace.Method ONCHIP
+
+;SYSTEM.UP
+
+;============================================================================
+; Init important register for memory(RAM)
+;============================================================================
+;  dram initialization
+d.s 0xf0500000 %q 0000000000000400
+d.s 0xf0500008 %q 0000000050000050
+d.s 0xf0500010 %q 04000a02000000c8
+d.s 0xf0500018 %q 0305031116040202
+d.s 0xf0500020 %q 0003030000000502
+d.s 0xf0500028 %q 0000c80b06050101
+;d.s 0xf0500030 %q 0000000600a01203
+d.s 0xf0500030 %q 0100000600a01203  ; SDRAM keep refresh
+d.s 0xf0500038 %q 0002000208000601 ;[37:24] tREF, [17:8] tRFC, based on 66MHz
+;d.s 0xf0500038 %q 0002000104000301 ;[37:24] tREF, [17:8] tRFC, based on 33MHz
+;d.s 0xf0500040 %q 0000003700c8000a
+d.s 0xf0500040 %q 0100003700c8000a ;[56] pwrup_selfrefresh_exit
+;d.s 0xf0500048 %q 0000400a53000001
+d.s 0xf0500048 %q 0000440a53000001 ;[40] DLL enable=1 (disable), 75R, reduced strength
+d.s 0xf0500050 %q 0100000000000000
+d.s 0xf0500058 %q 0000000000000001
+d.s 0xf0500060 %q 0000000000000000
+d.s 0xf0500068 %q 4000400001000002
+;d.s 0xf0500070 %q 07070a0001010002 ;;; check bit[25], set in ASIC
+d.s 0xf0500070 %q 07070a0101010002 ;;; new DDR controller
+;d.s 0xf0500070 %q 07070a0000010002 ;[26:24] addr_pins
+d.s 0xf0500078 %q 0c01010101010101
+d.s 0xf0500080 %q 0000000100000000
+d.s 0xf0500088 %q 0000000000000000
+d.s 0xf0500090 %q 0000000000000000
+d.s 0xf0500098 %q 0000000000000000
+d.s 0xf05000a0 %q 0000000000000000
+d.s 0xf05000a8 %q 0000000000000000
+d.s 0xf05000b0 %q 0000000000000000
+d.s 0xf05000b8 %q 0000000000000000
+d.s 0xf05000c0 %q 0400000000000000
+d.s 0xf05000c8 %q 0000000000000000
+d.s 0xf05000d0 %q 0000000000000000
+d.s 0xf05000d8 %q 0000000000002819
+d.s 0xf05000e0 %q 0000000000000000
+d.s 0xf05000e8 %q 0000000000000000
+d.s 0xf05000f0 %q 0000000000000000
+d.s 0xf05000f8 %q 00000000001c1c00
+d.s 0xf0500100 %q 0000000000000000
+d.s 0xf0500108 %q 0000000000001c1c
+d.s 0xf0500110 %q 001c1c0000000000
+d.s 0xf0500118 %q 0000000000000000
+d.s 0xf0500120 %q 0000001c1c000000
+d.s 0xf0500128 %q 02ffff000202ffff
+d.s 0xf0500130 %q 00000202ffff0002
+d.s 0xf0500138 %q 0132030001000000
+d.s 0xf0500140 %q 3200013200013200
+d.s 0xf0500148 %q 0000000000000001
+d.s 0xf0500150 %q 0c2d000000000700
+d.s 0xf0500158 %q 0200020002000200
+;d.s 0xf0500160 %q 0303800004080c2d
+d.s 0xf0500160 %q 0303800003040c2d ;[27:24] wrlat_adj, [20:16] rdlat_adj
+d.s 0xf0500168 %q 00000c2d000a0407
+d.s 0xf0500170 %q 0010ffff00000000
+d.s 0xf0500178 %q 0000000f11070303
+d.s 0xf0500180 %q 0000000000000c2d
+d.s 0xf0500188 %q 0000000000000000
+d.s 0xf0500190 %q 0000020400000c2d
+d.s 0xf0500198 %q 0100000000000000
+d.s 0xf05001a0 %q 0000000000006d60
+d.s 0xf05001a8 %q 0000000000000000
+d.s 0xf05001b0 %q 0000000000003ce1
+;init PHY (Samsung, can be skipped)
+d.s 0xf0500200 %q 0001100000000000
+d.s 0xf0500208 %q 0000000000000e38
+d.s 0xf0500210 %q 0000002010108000
+d.s 0xf0500218 %q 0000000000000600
+d.s 0xf0500220 %q 0000000000000000
+d.s 0xf0500228 %q 0000000000000000
+d.s 0xf0500230 %q 0000300004252000
+d.s 0xf0500238 %q 0000000000000000
+d.s 0xf0500240 %q 0000000000000000
+;set mode register
+d.s 0xf0500000 %q 0000000000000401
+
+
+;L2 address filtering start address, for memory swap
+d.s 0xf5010c00 %l 0xe0000001
+d.s 0xf5010c04 %l 0xe8000000
+
+;============================================================================
+; Load our binary and symbol
+;============================================================================
+;d.load.binary d:\xilinx_fpga\zImage 0xe1600000 /verify
+d.load.binary Q:\FPGA\g2-2.6.36\G2_0509_36\g2\openwrt-2.4.2011-trunk\build_dir\linux-g2_fpga\linux-2.6.36\arch\arm\boot\zImage 0xe1600000 /verify
+;d.load.binary W:\shares\zImage_2011-02-26_owrt 0xe1600000 /verify
+;d.load.elf S:\openwrt-g2-36-20110304102300\g2-36\release\vmlinux /nocode
+
+
+r.s r1 0x33C	; mach-id
+r.s r2 0xE0000100	; atag position
+r.s pc 0xe1600000
+
+data.list
+
+B::TRONCHIP.SET DABORT OFF
+B::TRONCHIP.SET PABORT OFF
+B::TRONCHIP.SET UNDEF OFF
+
+go	
+d.load.elf Q:\FPGA\g2-2.6.36\G2_0509_36\g2\openwrt-2.4.2011-trunk\build_dir\linux-g2_fpga\linux-2.6.36\vmlinux /nocode
+
+end		
+; *********** Add by cxc according to Jason's new cmm scripts **************
+; FIXED OK FOR NEW UART
+data.set 0xf0070110 %l 0x0001B2e3		; Enable UART0,RX,TX,baudrate to 115200. Assume uart_clk=50000000
+data.set 0xf0070118 %l 0x000000d9		; Sample rate
+data.set 0xf0070120 %b 0x4F		; print 'O'
+data.set 0xf0070120 %b 0x4B		; print 'K'
+data.set 0xf0070120 %b 0x21		; print '!'
+data.set 0xf0070120 %b 0x0D		;
+data.set 0xf0070120 %b 0x0A		;
+
+
+;;INFO: 345462: cpu: *************Starting TM initialization...
+data.set 0xf0040000 %l 0x00000341     ; generated by script
+data.set 0xf0040000 %l 0x00000000     ; generated by script
+data.set 0xf004003c %l 0x00c40100     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000000     ; generated by script
+data.set 0xf0040084 %l 0x00006000     ; generated by script
+data.set 0xf0040080 %l 0xc0000001     ; generated by script
+data.set 0xf0040084 %l 0x0000a000     ; generated by script
+data.set 0xf0040080 %l 0xc0000002     ; generated by script
+data.set 0xf0040084 %l 0x0000e000     ; generated by script
+data.set 0xf0040080 %l 0xc0000003     ; generated by script
+data.set 0xf0040084 %l 0x00012000     ; generated by script
+data.set 0xf0040080 %l 0xc0000004     ; generated by script
+data.set 0xf0040084 %l 0x00016000     ; generated by script
+data.set 0xf0040080 %l 0xc0000005     ; generated by script
+data.set 0xf0040084 %l 0x0001a000     ; generated by script
+data.set 0xf0040080 %l 0xc0000006     ; generated by script
+data.set 0xf0040084 %l 0x0001e000     ; generated by script
+data.set 0xf0040080 %l 0xc0000007     ; generated by script
+data.set 0xf0040084 %l 0x00022000     ; generated by script
+data.set 0xf0040080 %l 0xc0000008     ; generated by script
+data.set 0xf0040084 %l 0x00026000     ; generated by script
+data.set 0xf0040080 %l 0xc0000009     ; generated by script
+data.set 0xf0040084 %l 0x0002a000     ; generated by script
+data.set 0xf0040080 %l 0xc000000a     ; generated by script
+data.set 0xf0040084 %l 0x0002e000     ; generated by script
+data.set 0xf0040080 %l 0xc000000b     ; generated by script
+data.set 0xf0040084 %l 0x00032000     ; generated by script
+data.set 0xf0040080 %l 0xc000000c     ; generated by script
+data.set 0xf0040084 %l 0x00036000     ; generated by script
+data.set 0xf0040080 %l 0xc000000d     ; generated by script
+data.set 0xf0040084 %l 0x0003a000     ; generated by script
+data.set 0xf0040080 %l 0xc000000e     ; generated by script
+data.set 0xf0040084 %l 0x0003e000     ; generated by script
+data.set 0xf0040080 %l 0xc000000f     ; generated by script
+data.set 0xf0040084 %l 0x00042000     ; generated by script
+data.set 0xf0040080 %l 0xc0000010     ; generated by script
+data.set 0xf0040084 %l 0x00046000     ; generated by script
+data.set 0xf0040080 %l 0xc0000011     ; generated by script
+data.set 0xf0040084 %l 0x0004a000     ; generated by script
+data.set 0xf0040080 %l 0xc0000012     ; generated by script
+data.set 0xf0040084 %l 0x0004e000     ; generated by script
+data.set 0xf0040080 %l 0xc0000013     ; generated by script
+data.set 0xf0040084 %l 0x00052000     ; generated by script
+data.set 0xf0040080 %l 0xc0000014     ; generated by script
+data.set 0xf0040084 %l 0x00056000     ; generated by script
+data.set 0xf0040080 %l 0xc0000015     ; generated by script
+data.set 0xf0040084 %l 0x0005a000     ; generated by script
+data.set 0xf0040080 %l 0xc0000016     ; generated by script
+data.set 0xf0040084 %l 0x0005e000     ; generated by script
+data.set 0xf0040080 %l 0xc0000017     ; generated by script
+data.set 0xf0040084 %l 0x00062000     ; generated by script
+data.set 0xf0040080 %l 0xc0000018     ; generated by script
+data.set 0xf0040084 %l 0x00066000     ; generated by script
+data.set 0xf0040080 %l 0xc0000019     ; generated by script
+data.set 0xf0040084 %l 0x0006a000     ; generated by script
+data.set 0xf0040080 %l 0xc000001a     ; generated by script
+data.set 0xf0040084 %l 0x0006e000     ; generated by script
+data.set 0xf0040080 %l 0xc000001b     ; generated by script
+data.set 0xf0040084 %l 0x00072000     ; generated by script
+data.set 0xf0040080 %l 0xc000001c     ; generated by script
+data.set 0xf0040084 %l 0x00076000     ; generated by script
+data.set 0xf0040080 %l 0xc000001d     ; generated by script
+data.set 0xf0040084 %l 0x0007a000     ; generated by script
+data.set 0xf0040080 %l 0xc000001e     ; generated by script
+data.set 0xf0040084 %l 0x0007e000     ; generated by script
+data.set 0xf0040080 %l 0xc000001f     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000020     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000021     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000022     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000023     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000024     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000025     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000026     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000027     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000028     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000029     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000002a     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000002b     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000002c     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000002d     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000002e     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000002f     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000030     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000031     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000032     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000033     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000034     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000035     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000036     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000037     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000038     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000039     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000003a     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000003b     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000003c     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000003d     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000003e     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000003f     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000040     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000041     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000042     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000043     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000044     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000045     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000046     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000047     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000048     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000049     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000004a     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000004b     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000004c     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000004d     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000004e     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000004f     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000050     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000051     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000052     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000053     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000054     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000055     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000056     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000057     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000058     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000059     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000005a     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000005b     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000005c     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000005d     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000005e     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000005f     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000060     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000061     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000062     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000063     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000064     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000065     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000066     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000067     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000068     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc0000069     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000006a     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000006b     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000006c     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000006d     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000006e     ; generated by script
+data.set 0xf0040084 %l 0x00002000     ; generated by script
+data.set 0xf0040080 %l 0xc000006f     ; generated by script
+data.set 0xf00400c8 %l 0x0f800000     ; generated by script
+data.set 0xf00400c4 %l 0x00000000     ; generated by script
+data.set 0xf00400c0 %l 0xc0000000     ; generated by script
+data.set 0xf0040100 %l 0x00000000     ; generated by script
+data.set 0xf0040104 %l 0x00000004     ; generated by script
+data.set 0xf0040400 %l 0x600000d1     ; generated by script
+data.set 0xf0040400 %l 0x600000d0     ; generated by script
+data.set 0xf0040210 %l 0x00400000     ; generated by script
+data.set 0xf0040214 %l 0x00400001     ; generated by script
+data.set 0xf0040218 %l 0x00400002     ; generated by script
+;;INFO: 352593: cpu: *************Starting NI initialization...
+data.set 0xf00101ac %l 0x007d0000     ; generated by script
+data.set 0xf00101b0 %l 0x00fb007e     ; generated by script
+data.set 0xf00101b4 %l 0x017900fc     ; generated by script
+data.set 0xf00101b8 %l 0x01f7017a     ; generated by script
+data.set 0xf00101bc %l 0x027501f8     ; generated by script
+data.set 0xf00101c0 %l 0x02f30276     ; generated by script
+data.set 0xf00101c4 %l 0x037102f4     ; generated by script
+data.set 0xf00101c8 %l 0x03ef0372     ; generated by script
+data.set 0xf00101cc %l 0x04f303f0     ; generated by script
+data.set 0xf00101d0 %l 0x06fb05f8     ; generated by script
+data.set 0xf00101d4 %l 0x07ff06fc     ; generated by script
+data.set 0xf00101d8 %l 0x8a00c000     ; generated by script
+data.set 0xf0010010 %l 0x0010082c     ; generated by script
+data.set 0xf001001c %l 0x0010082c     ; generated by script
+data.set 0xf0010014 %l 0x00008f00     ; generated by script
+data.set 0xf0010020 %l 0x00018f00     ; generated by script
+data.set 0xf001002c %l 0x00028f00     ; generated by script
+data.set 0xf0010040 %l 0x0000bb00     ; generated by script
+data.set 0xf0010050 %l 0x004023f0     ; generated by script
+data.set 0xf0010098 %l 0x02880028     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000000     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000001     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc0000002     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc0000003     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc0000004     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc0000005     ; generated by script
+data.set 0xf00100b0 %l 0x00000003     ; generated by script
+data.set 0xf00100ac %l 0xc0000006     ; generated by script
+data.set 0xf00100b0 %l 0x00000007     ; generated by script
+data.set 0xf00100ac %l 0xc0000007     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000008     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000009     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc000000a     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc000000b     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc000000c     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc000000d     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc000000e     ; generated by script
+data.set 0xf00100b0 %l 0x00000007     ; generated by script
+data.set 0xf00100ac %l 0xc000000f     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000010     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000011     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc0000012     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc0000013     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc0000014     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc0000015     ; generated by script
+data.set 0xf00100b0 %l 0x00000003     ; generated by script
+data.set 0xf00100ac %l 0xc0000016     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc0000017     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000018     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000019     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc000001a     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc000001b     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc000001c     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc000001d     ; generated by script
+data.set 0xf00100b0 %l 0x00000003     ; generated by script
+data.set 0xf00100ac %l 0xc000001e     ; generated by script
+data.set 0xf00100b0 %l 0x00000007     ; generated by script
+data.set 0xf00100ac %l 0xc000001f     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000020     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000021     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc0000022     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc0000023     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc0000024     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc0000025     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc0000026     ; generated by script
+data.set 0xf00100b0 %l 0x00000003     ; generated by script
+data.set 0xf00100ac %l 0xc0000027     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000028     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000029     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc000002a     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc000002b     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc000002c     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc000002d     ; generated by script
+data.set 0xf00100b0 %l 0x00000007     ; generated by script
+data.set 0xf00100ac %l 0xc000002e     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc000002f     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000030     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000031     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc0000032     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc0000033     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc0000034     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc0000035     ; generated by script
+data.set 0xf00100b0 %l 0x00000003     ; generated by script
+data.set 0xf00100ac %l 0xc0000036     ; generated by script
+data.set 0xf00100b0 %l 0x00000007     ; generated by script
+data.set 0xf00100ac %l 0xc0000037     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000038     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000039     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc000003a     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc000003b     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc000003c     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc000003d     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc000003e     ; generated by script
+data.set 0xf00100b0 %l 0x00000007     ; generated by script
+data.set 0xf00100ac %l 0xc000003f     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000040     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000041     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc0000042     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc0000043     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc0000044     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc0000045     ; generated by script
+data.set 0xf00100b0 %l 0x00000003     ; generated by script
+data.set 0xf00100ac %l 0xc0000046     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc0000047     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000048     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000049     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc000004a     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc000004b     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc000004c     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc000004d     ; generated by script
+data.set 0xf00100b0 %l 0x00000003     ; generated by script
+data.set 0xf00100ac %l 0xc000004e     ; generated by script
+data.set 0xf00100b0 %l 0x00000007     ; generated by script
+data.set 0xf00100ac %l 0xc000004f     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000050     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000051     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc0000052     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc0000053     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc0000054     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc0000055     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc0000056     ; generated by script
+data.set 0xf00100b0 %l 0x00000003     ; generated by script
+data.set 0xf00100ac %l 0xc0000057     ; generated by script
+data.set 0xf00100b0 %l 0x00000000     ; generated by script
+data.set 0xf00100ac %l 0xc0000058     ; generated by script
+data.set 0xf00100b0 %l 0x00000001     ; generated by script
+data.set 0xf00100ac %l 0xc0000059     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc000005a     ; generated by script
+data.set 0xf00100b0 %l 0x00000002     ; generated by script
+data.set 0xf00100ac %l 0xc000005b     ; generated by script
+data.set 0xf00100b0 %l 0x00000005     ; generated by script
+data.set 0xf00100ac %l 0xc000005c     ; generated by script
+data.set 0xf00100b0 %l 0x00000006     ; generated by script
+data.set 0xf00100ac %l 0xc000005d     ; generated by script
+data.set 0xf00100b0 %l 0x00000007     ; generated by script
+data.set 0xf00100ac %l 0xc000005e     ; generated by script
+data.set 0xf00100b0 %l 0x00000004     ; generated by script
+data.set 0xf00100ac %l 0xc000005f     ; generated by script
+data.set 0xf00100b8 %l 0x00000000     ; generated by script
+data.set 0xf00100b4 %l 0xc0000000     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000000     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000001     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000002     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000003     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000004     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000005     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000006     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000007     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000008     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000009     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000000a     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000000b     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000000c     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000000d     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000000e     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000000f     ; generated by script
+data.set 0xf00100d4 %l 0x00000002     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000010     ; generated by script
+data.set 0xf00100d4 %l 0x00000002     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000011     ; generated by script
+data.set 0xf00100d4 %l 0x00000002     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000012     ; generated by script
+data.set 0xf00100d4 %l 0x00000002     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000013     ; generated by script
+data.set 0xf00100d4 %l 0x00000002     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000014     ; generated by script
+data.set 0xf00100d4 %l 0x00000002     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000015     ; generated by script
+data.set 0xf00100d4 %l 0x00000002     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000016     ; generated by script
+data.set 0xf00100d4 %l 0x00000002     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000017     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000018     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000019     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000001a     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000001b     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000001c     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000001d     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000001e     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000001f     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000020     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000021     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000022     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000023     ; generated by script
+data.set 0xf00100d4 %l 0x00000001     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000024     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000025     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000026     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000027     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000028     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000029     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000002a     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000002b     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000002c     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000002d     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000002e     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000002f     ; generated by script
+data.set 0xf00100d4 %l 0x00000008     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000030     ; generated by script
+data.set 0xf00100d4 %l 0x00000008     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000031     ; generated by script
+data.set 0xf00100d4 %l 0x00000008     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000032     ; generated by script
+data.set 0xf00100d4 %l 0x00000008     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000033     ; generated by script
+data.set 0xf00100d4 %l 0x00000008     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000034     ; generated by script
+data.set 0xf00100d4 %l 0x00000008     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000035     ; generated by script
+data.set 0xf00100d4 %l 0x00000008     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000036     ; generated by script
+data.set 0xf00100d4 %l 0x00000008     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000037     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000038     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000039     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000003a     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000003b     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000003c     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000003d     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000003e     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000003f     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000040     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000041     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000042     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000043     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000044     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000045     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000046     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000047     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000048     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000049     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000004a     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000004b     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000004c     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000004d     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000004e     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000004f     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000050     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000051     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000052     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000053     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000054     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000055     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000056     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000057     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000058     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000059     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000005a     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000005b     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000005c     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000005d     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000005e     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000005f     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000060     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000061     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000062     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000063     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000064     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000065     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000066     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000067     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000068     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc0000069     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000006a     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000006b     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000006c     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000006d     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000006e     ; generated by script
+data.set 0xf00100d4 %l 0x00000000     ; generated by script
+data.set 0xf00100d0 %l 0x00000000     ; generated by script
+data.set 0xf00100cc %l 0xc000006f     ; generated by script
+data.set 0xf00100dc %l 0x00000000     ; generated by script
+data.set 0xf00100d8 %l 0xc0000000     ; generated by script
+data.set 0xf00102e8 %l 0x00000000     ; generated by script
+data.set 0xf00102e4 %l 0x00000000     ; generated by script
+data.set 0xf00102e0 %l 0xc0000000     ; generated by script
+data.set 0xf0010374 %l 0x00f7fdff     ; generated by script
+data.set 0xf001036c %l 0xfffffdff     ; generated by script
+data.set 0xf0010364 %l 0x000001ff     ; generated by script
+data.set 0xf001035c %l 0x000001ff     ; generated by script
+data.set 0xf0010354 %l 0x000001ff     ; generated by script
+data.set 0xf001034c %l 0x000003ff     ; generated by script
+data.set 0xf0010344 %l 0x00003fff     ; generated by script
+data.set 0xf001033c %l 0x000001ff     ; generated by script
+data.set 0xf0010334 %l 0x000001ff     ; generated by script
+data.set 0xf001032c %l 0x000001ff     ; generated by script
+data.set 0xf0010324 %l 0x000001ff     ; generated by script
+data.set 0xf001031c %l 0x000001ff     ; generated by script
+data.set 0xf0010314 %l 0x000001ff     ; generated by script
+data.set 0xf001030c %l 0x000001ff     ; generated by script
+data.set 0xf0010304 %l 0x000001ff     ; generated by script
+data.set 0xf001037c %l 0x00007fff     ; generated by script
+data.set 0xf0010410 %l 0x00f7fdff     ; generated by script
+data.set 0xf0010408 %l 0xfffffdff     ; generated by script
+data.set 0xf0010400 %l 0x000001ff     ; generated by script
+data.set 0xf00103f8 %l 0x000001ff     ; generated by script
+data.set 0xf00103f0 %l 0x000001ff     ; generated by script
+data.set 0xf00103e8 %l 0x000003ff     ; generated by script
+data.set 0xf00103e0 %l 0x00003fff     ; generated by script
+data.set 0xf00103d8 %l 0x000001ff     ; generated by script
+data.set 0xf00103d0 %l 0x000001ff     ; generated by script
+data.set 0xf00103c8 %l 0x000001ff     ; generated by script
+data.set 0xf00103c0 %l 0x000001ff     ; generated by script
+data.set 0xf00103b8 %l 0x000001ff     ; generated by script
+data.set 0xf00103b0 %l 0x000001ff     ; generated by script
+data.set 0xf00103a8 %l 0x000001ff     ; generated by script
+data.set 0xf00103a0 %l 0x000001ff     ; generated by script
+data.set 0xf0010418 %l 0x00007fff     ; generated by script
+data.set 0xf0010384 %l 0x000001ff     ; generated by script
+data.set 0xf001038c %l 0x00000000     ; Modified by Pritam
+data.set 0xf0010420 %l 0x000001ff     ; generated by script
+data.set 0xf0010428 %l 0x00000000     ; Modified by Pritam
+data.set 0xf001005c %l 0x00003001     ; Modified by Pritam
+data.set 0xf0010064 %l 0x00003801     ; Modified by Pritam
+data.set 0xf001006c %l 0x00004001     ; Modified by Pritam
+
+;;INFO: 361008: cpu: *************Done NI initialization...
+;;INFO: 361008: cpu: *************Starting FE initialization...
+;;INFO: 406872: cpu: *************Done FE initialization...
+;;INFO: 406872: cpu: *************Starting QM initialization...
+;;INFO: 406932: cpu: *************Starting DMA/LSO/SSP initialization...
+
+data.set 0xf0010050 %l 0x00280800       ; min packet size 40. max 2048
+
+;go
+;d.load.elf J:\Work\G2_SMP\g2\openwrt-10.03\build_dir\linux-g2-fpga\linux-2.6.32.3\vmlinux /nocode
+
+end
+
+
+
+;******************
+;SEMIHOSTING SET UP
+;******************
+;activate vector catch of SVC (SWI) vector
+TrOnchip.Set SWI ON
+;Set heap and stack base-limit addresses
+;TERM.HEAPINFO [<heap_base>] [<heap_limit>] [<stack_base>] [<stack_limit>]
+TERM.HEAPINFO 0x40000 0x50000 0x80000 0x70000
+TERM.METHOD ARMSWI 0x8
+;Set Mode for the output console
+TERM.MODE string
+;Open output console (gate)
+TERM.GATE
+
+;**********
+;ETM SET UP
+;**********
+;Open ETM settings
+ETM.View
+;default 8 bit port size
+ETM.PortSize 8
+;default Normal Mode
+ETM.PortMode Normal
+;default ON
+ETM.ON
+;Open analyzer window
+Trace.List
+;go
+
+
+

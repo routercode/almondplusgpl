@@ -1,0 +1,111 @@
+--- a/libopkg/pkg.c
++++ b/libopkg/pkg.c
+@@ -83,6 +83,8 @@ pkg_init(pkg_t *pkg)
+      pkg->src = NULL;
+      pkg->architecture = NULL;
+      pkg->maintainer = NULL;
++     pkg->title = NULL;
++     pkg->category = NULL;
+      pkg->section = NULL;
+      pkg->description = NULL;
+      pkg->state_want = SW_UNKNOWN;
+@@ -182,6 +184,14 @@ pkg_deinit(pkg_t *pkg)
+ 		free(pkg->maintainer);
+ 	pkg->maintainer = NULL;
+ 
++	if (pkg->title)
++		free(pkg->title);
++	pkg->title = NULL;
++
++	if (pkg->category)
++		free(pkg->category);
++	pkg->category = NULL;
++
+ 	if (pkg->section)
+ 		free(pkg->section);
+ 	pkg->section = NULL;
+@@ -351,6 +361,10 @@ pkg_merge(pkg_t *oldpkg, pkg_t *newpkg)
+ 	  oldpkg->section = xstrdup(newpkg->section);
+      if(!oldpkg->maintainer)
+ 	  oldpkg->maintainer = xstrdup(newpkg->maintainer);
++     if(!oldpkg->title)
++	  oldpkg->title = xstrdup(newpkg->title);
++     if(!oldpkg->category)
++	  oldpkg->category = xstrdup(newpkg->category);
+      if(!oldpkg->description)
+ 	  oldpkg->description = xstrdup(newpkg->description);
+ 
+@@ -663,6 +677,10 @@ pkg_formatted_field(FILE *fp, pkg_t *pkg
+                     }
+                     fprintf(fp, "\n");
+ 	       }
++          } else if (strcasecmp(field, "Category") == 0) {
++	       if (pkg->category) {
++                   fprintf(fp, "Category: %s\n", pkg->category);
++	       }
+ 	  } else {
+ 	       goto UNKNOWN_FMT_FIELD;
+ 	  }
+@@ -822,6 +840,11 @@ pkg_formatted_field(FILE *fp, pkg_t *pkg
+                    fprintf(fp, "Tags: %s\n", pkg->tags);
+ 	       }
+ 	  }
++          else if (strcasecmp(field, "Title") == 0) {
++	       if (pkg->title) {
++                   fprintf(fp, "Title: %s\n", pkg->title);
++	       }
++          }
+ 	  break;
+      case 'v':
+      case 'V':
+@@ -864,6 +887,8 @@ pkg_formatted_info(FILE *fp, pkg_t *pkg)
+ 	pkg_formatted_field(fp, pkg, "Filename");
+ 	pkg_formatted_field(fp, pkg, "Conffiles");
+ 	pkg_formatted_field(fp, pkg, "Source");
++	pkg_formatted_field(fp, pkg, "Title");
++	pkg_formatted_field(fp, pkg, "Category");
+ 	pkg_formatted_field(fp, pkg, "Description");
+ 	pkg_formatted_field(fp, pkg, "Installed-Time");
+ 	pkg_formatted_field(fp, pkg, "Tags");
+--- a/libopkg/pkg.h
++++ b/libopkg/pkg.h
+@@ -184,6 +184,8 @@ struct pkg
+      /* this flag specifies whether the package was installed to satisfy another
+       * package's dependancies */
+      int auto_installed;
++     char *title;
++     char *category;
+ };
+ 
+ pkg_t *pkg_new(void);
+--- a/libopkg/pkg_parse.c
++++ b/libopkg/pkg_parse.c
+@@ -195,6 +195,8 @@ pkg_parse_line(pkg_t *pkg, const char *l
+ 	    	}
+ 		else if ((mask & PFM_CONFLICTS) && is_field("Conflicts", line))
+ 			pkg->conflicts_str = parse_comma_separated(line, &pkg->conflicts_count);
++		else if((mask & PFM_CATEGORY) && is_field("Category", line))
++			pkg->category = parse_simple("Category", line);
+ 		break;
+ 
+ 	case 'D':
+@@ -285,6 +287,8 @@ pkg_parse_line(pkg_t *pkg, const char *l
+ 	case 'T':
+ 		if ((mask & PFM_TAGS) && is_field("Tags", line))
+ 			pkg->tags = parse_simple("Tags", line);
++		else if ((mask & PFM_TITLE) && is_field("Title", line))
++		        pkg->title = parse_simple("Title", line);
+ 		break;
+ 
+ 	case 'V':
+--- a/libopkg/pkg_parse.h
++++ b/libopkg/pkg_parse.h
+@@ -52,6 +52,8 @@ int pkg_parse_from_stream_nomalloc(pkg_t
+ #define PFM_SUGGESTS		(1 << 24)
+ #define PFM_TAGS		(1 << 25)
+ #define PFM_VERSION		(1 << 26)
++#define PFM_TITLE		(1 << 27)
++#define PFM_CATEGORY		(1 << 28)
+ 
+ #define PFM_ALL	(~(uint)0)
+ 

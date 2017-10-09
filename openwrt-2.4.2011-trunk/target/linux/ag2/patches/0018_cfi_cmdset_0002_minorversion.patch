@@ -1,0 +1,12 @@
+diff -Naur old/drivers/mtd/chips/cfi_cmdset_0002.c new/drivers/mtd/chips/cfi_cmdset_0002.c
+--- old/drivers/mtd/chips/cfi_cmdset_0002.c	2011-07-12 14:03:36.000000000 -0700
++++ new/drivers/mtd/chips/cfi_cmdset_0002.c	2011-07-12 14:04:08.000000000 -0700
+@@ -448,7 +448,7 @@
+ 			 *      Spec 1.4 http://www.spansion.com/Support/AppNotes/CFI_Spec_AN_03.pdf, page 9
+ 			 */
+ 			if (extp->MajorVersion != '1' ||
+-			    (extp->MajorVersion == '1' && (extp->MinorVersion < '0' || extp->MinorVersion > '4'))) {
++			    (extp->MajorVersion == '1' && (extp->MinorVersion < '0' || extp->MinorVersion > '5'))) {
+ 				printk(KERN_ERR "  Unknown Amd/Fujitsu Extended Query "
+ 				       "version %c.%c (%#02x/%#02x).\n",
+ 				       extp->MajorVersion, extp->MinorVersion,

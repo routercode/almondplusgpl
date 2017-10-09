@@ -1,0 +1,143 @@
+#!/usr/bin/env python
+
+import os
+import sys
+import getopt
+import errno
+from struct import *
+
+MAGIC_NUMBER = 0xa4411376
+STRUCT_FILE_HEADER = '2I'
+STRUCT_IMAGE_HEADER = '32s6I'
+DATA_OFFSET = 512
+
+
+def usage(programe_name):
+    print programe_name, ' -n name -a partition_addr -s partition size',\
+        '-i fileame -m major -r minor -o output'
+
+
+def parse_options():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hn:a:s:i:m:r:o:")
+    except getopt.GetoptError, err:
+        print str(err)
+        usage(sys.argv[0])
+        sys.exit(errno.EINVAL)
+
+    image_info = dict()
+    for opt, arg in opts:
+        if opt == '-h':
+            usage(sys.argv[0])
+            sys.exit(0)
+        elif opt == '-n':
+            image_info['name'] = arg
+        elif opt == '-a':
+            image_info['addr'] = int(arg, 0)
+        elif opt == '-s':
+            image_info['size'] = int(arg, 0)
+        elif opt == '-i':
+            image_info['input'] = arg
+        elif opt == '-m':
+            image_info['major'] = int(arg, 0)
+        elif opt == '-r':
+            image_info['minor'] = int(arg, 0)
+        elif opt == '-o':
+            image_info['output'] = arg
+        else:
+            usage(sys.argv[0])
+            sys.exit(errno.EINVAL)
+
+    for opt in ('name', 'addr', 'size', 'input', 'major', 'minor', 'output'):
+        if not opt in image_info:
+            usage(sys.argv[0])
+            sys.exit(errno.EINVAL)
+
+    for opt in ('addr', 'size', 'major', 'minor'):
+        if image_info[opt] < 0:
+            usage(sys.argv[0])
+            sys.exit(errno.EINVAL)
+
+    if len(image_info['name']) >= 32:
+        usage(sys.argv[0])
+        sys.exit(errno.ENAMETOOLONG)
+
+    if not os.path.isfile(image_info['input']):
+        print image_info['input'], " is not existed"
+        usage(sys.argv[0])
+        sys.exit(errno.ENOENT)
+
+    if os.path.getsize(image_info['input']) > image_info['size']:
+        print 'size is not enough'
+        usage(sys.argv[0])
+        sys.exit(errno.ENOSPC)
+
+    if os.path.isfile(image_info['output']):
+        f = open(image_info['output'], "r")
+        header = f.read(calcsize(STRUCT_FILE_HEADER))
+        f.close()
+        (magic_number, image_number) = unpack(STRUCT_FILE_HEADER, header)
+        headers_size = calcsize(STRUCT_FILE_HEADER) + \
+            image_number * calcsize(STRUCT_IMAGE_HEADER)
+
+        if  magic_number != MAGIC_NUMBER or image_number == 0 \
+            or headers_size > DATA_OFFSET:
+            print image_info['input'], ' is existed and not right'
+            usage(sys.argv[0])
+            sys.exit(errno.EEXIST)
+
+        if (headers_size + calcsize(STRUCT_IMAGE_HEADER) > DATA_OFFSET):
+            print 'Too many images!Space is not enough!'
+            usage(sys.argv[0])
+            sys.exit(errno.ENOSPC)
+
+    return image_info
+
+
+def main():
+    info = parse_options()
+
+    if os.path.isfile(info['output']):
+        header_size = calcsize(STRUCT_IMAGE_HEADER)
+
+        f = open(info['output'], "r")
+        header = f.read(calcsize(STRUCT_FILE_HEADER))
+        (magic_number, image_number) = unpack(STRUCT_FILE_HEADER, header)
+        image_headers = f.read(header_size * image_number)
+	f.seek(DATA_OFFSET)
+        images_buf = f.read()
+        offset = f.tell()
+        f.close()
+    else:
+        image_number = 0
+        offset = DATA_OFFSET
+
+    image_number += 1
+    file_header = pack(STRUCT_FILE_HEADER, MAGIC_NUMBER, image_number)
+    new_image_header = pack(STRUCT_IMAGE_HEADER, info['name'], info['major'], \
+                            info['minor'], offset, \
+                            os.path.getsize(info['input']), \
+                            info['addr'], info['size'])
+
+    outfile = open(info['output'], 'w')
+    infile = open(info['input'], 'r')
+
+    outfile.write(file_header)
+    if image_number > 1:
+        outfile.write(image_headers)
+        outfile.write(new_image_header)
+
+        outfile.seek(DATA_OFFSET)
+        outfile.write(images_buf)
+    else:
+        outfile.write(new_image_header)
+        outfile.seek(DATA_OFFSET)
+
+    outfile.write(infile.read())
+
+    infile.close()
+    outfile.close()
+
+
+if __name__ == "__main__":
+    main()

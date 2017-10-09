@@ -1,0 +1,6 @@
+#!/bin/sh
+# Copyright (C) 2008-2010 OpenWrt.org
+SCRIPT_DIR=/etc/cs75xx/hw_accel/demo
+
+value=$1
+$SCRIPT_DIR/setup_cs_wfo_mode.sh $value

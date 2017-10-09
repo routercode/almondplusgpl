@@ -1,0 +1,48 @@
+diff -Naur linux-2.6.36/mm/memblock.c linux-2.6.36-new/mm/memblock.c
+--- linux-2.6.36/mm/memblock.c	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36-new/mm/memblock.c	2011-09-04 11:09:23.000000000 -0700
+@@ -14,6 +14,7 @@
+ #include <linux/init.h>
+ #include <linux/bitops.h>
+ #include <linux/memblock.h>
++#include <mach/debug_print.h>
+ 
+ #define MEMBLOCK_ALLOC_ANYWHERE	0
+ 
+@@ -395,11 +396,13 @@
+ 	BUG_ON(0 == size);
+ 
+ 	size = memblock_align_up(size, align);
+-
++// Suresh need to figure out way to reserve bootmem in architecture file
++#ifdef FIXME
+ 	/* On some platforms, make sure we allocate lowmem */
+ 	/* Note that MEMBLOCK_REAL_LIMIT may be MEMBLOCK_ALLOC_ANYWHERE */
+ 	if (max_addr == MEMBLOCK_ALLOC_ANYWHERE)
+ 		max_addr = MEMBLOCK_REAL_LIMIT;
++#endif    
+ 
+ 	for (i = memblock.memory.cnt - 1; i >= 0; i--) {
+ 		u64 memblockbase = memblock.memory.region[i].base;
+@@ -419,16 +422,19 @@
+ 			j = memblock_overlaps_region(&memblock.reserved, base, size);
+ 			if (j < 0) {
+ 				/* this area isn't reserved, take it */
+-				if (memblock_add_region(&memblock.reserved, base, size) < 0)
++				if (memblock_add_region(&memblock.reserved, base, size) < 0) {
+ 					return 0;
++        }  
+ 				return base;
+ 			}
+ 			res_base = memblock.reserved.region[j].base;
+-			if (res_base < size)
++			if (res_base < size) {
+ 				break;
++      }  
+ 			base = memblock_align_down(res_base - size, align);
+ 		}
+ 	}
++
+ 	return 0;
+ }
+ 

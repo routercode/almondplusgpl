@@ -1,0 +1,24 @@
+--- linux-2.6.36/drivers/staging/udlfb/udlfb.c~	2010-10-20 13:30:22.000000000 -0700
++++ linux-2.6.36/drivers/staging/udlfb/udlfb.c	2011-08-31 14:55:53.189606885 -0700
+@@ -766,8 +766,8 @@
+ 	}
+ #endif
+ 
+-	dl_notice("open /dev/fb%d user=%d fb_info=%p count=%d\n",
+-	    info->node, user, info, dev->fb_count);
++	//	dl_notice("open /dev/fb%d user=%d fb_info=%p count=%d\n",
++	//	    info->node, user, info, dev->fb_count);
+ 
+ 	mutex_unlock(&dev->fb_open_lock);
+ 
+@@ -790,8 +790,8 @@
+ 	}
+ #endif
+ 
+-	dl_notice("release /dev/fb%d user=%d count=%d\n",
+-		  info->node, user, dev->fb_count);
++	//	dl_notice("release /dev/fb%d user=%d count=%d\n",
++	//		  info->node, user, dev->fb_count);
+ 
+ 	mutex_unlock(&dev->fb_open_lock);
+ 

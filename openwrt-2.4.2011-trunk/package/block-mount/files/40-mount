@@ -1,0 +1,156 @@
+#!/bin/sh
+# Copyright (C) 2009-2010 OpenWrt.org
+# Copyright (C) 2010 Vertical Communications
+# This is free software, licensed under the GNU General Public License v2.
+# See /LICENSE for more information.
+#
+
+. /lib/functions/block.sh
+
+get_fs_option() {
+	if [ ! -f /usr/sbin/blkid ]; then
+		echo ""
+		return
+	fi
+
+	fs=`/usr/sbin/blkid  -s TYPE $1 | sed -e 's/.*TYPE="//' -e 's/" *$//'`
+
+	if [ "$fs" == "" ]; then
+		echo "nofs"
+		return
+	fi
+
+	# NEW - obtain automounter mount options from /etc/config/fstab by fstype
+	config_get mopts "automount" "$fs" ''
+	echo "$mopts"
+	return
+}
+
+get_mount_point() {
+	
+	if_type="usb"
+	echo ${DEVPATH} | grep -q -e 'platform/goldengate-ahci' && { if_type="sata" ;}
+
+	if [ -f /usr/sbin/blkid ]; then
+		label=`/usr/sbin/blkid $1 -s LABEL | sed -e 's/.*LABEL="//' -e 's/" *$//'`
+		if [ "$label" != '' ];then
+			echo "/mnt/$if_type/$label"
+			return
+		fi
+	fi
+
+	node=`echo $1 | sed -e 's!/dev/sd!!'`
+	if [ -z "${node:1}" ]; then
+		echo "/mnt/$if_type$(( $(printf %u "'${node:0:1}") - 96 ))"
+	else
+		echo "/mnt/$if_type$(( $(printf %u "'${node:0:1}") - 96 ))_${node:1}"
+	fi
+}
+
+
+service_dir='/etc/hotplug.d/service'
+
+blkdev=`dirname $DEVPATH`
+device=`basename $DEVPATH`
+
+[ `basename $blkdev` == "block" -a "${device:0:2}" != "sd" ] && return
+[ "${device:0:3}" == 'ram' ] && return
+[ "${device:0:8}" == 'mtdblock' ] && return
+
+
+    case "$ACTION" in
+	add)
+
+		local from_fstab
+		local anon_mount
+		local anon_swap
+		local anon_fsck
+		local mds_mount_target
+		local mds_mount_device
+		local mds_mount_fstype
+		local sds_swap_device
+		local use_device
+		local do_fsck=0
+		local fsck_type
+		
+		local autoswap_from_fstab
+		local automount_from_fstab
+
+	    mount_dev_section_cb() {
+    		mds_mount_target="$2"
+			mds_mount_device="$3"
+			mds_mount_fstype="$4"
+			mds_mount_enabled="$6"
+	    }
+
+	    swap_dev_section_cb() { 
+			sds_swap_device="$2"
+			return 0
+	    }
+
+		config_get_automount
+		automount_from_fstab="$from_fstab"
+		[ "$automount_from_fstab" -eq 1 ] && {
+			config_get_mount_section_by_device "/dev/$device"
+			use_device="$mds_mount_device"
+			[ "$mds_mount_enabled" -eq 1 ] && {
+				if [ -n "$mds_mount_target" ]; then
+					grep -q "/dev/$device" /proc/swaps || grep -q "/dev/$device" /proc/mounts || {
+						( mkdir -p "$mds_mount_target" && mount "$mds_mount_target" ) 2>&1 | tee /proc/self/fd/2 | logger -t 'fstab'
+					}
+				else
+					logger -t 'fstab' "Mount enabled for $mds_mount_device but it doesn't have a defined mountpoint (target)"
+				fi
+			}
+		}
+
+		[ -z "$use_device" ] && {
+			config_get_autoswap
+			autoswap_from_fstab="$from_fstab"
+		
+			[ "$autoswap_from_fstab" -eq 1 ] && {
+				config_get_swap_section_by_device "/dev/$device"
+				use_device="$sds_swap_device"
+			}
+		}
+		
+		grep -q "/dev/$device" /proc/swaps || grep -q "/dev/$device" /proc/mounts || {
+			[ "$anon_mount" -eq 1 ] && [ -z "$use_device" ] && {
+				fs_option="$(get_fs_option "/dev/$device" )"
+				if [ "$fs_option" != "nofs" ]; then
+				  mount_point="$(get_mount_point "/dev/$device" )"
+				  mkdir -p "$mount_point" && mount $fs_option /dev/$device "$mount_point"
+
+
+				  grep -q -e "/dev/$device" /proc/mounts
+				  if [ $? -eq 0 ]; then
+					for script in $(ls $service_dir); do (
+						[ -f $service_dir/$script ] && . $service_dir/$script mount /dev/$device "$mount_point"
+					); done
+				  else
+					umount /dev/$device
+					rmdir $mount_point
+				  fi
+				fi
+			}
+		}
+		reset_dev_section_cb
+		;;
+	remove)
+		mount_point=`awk -v node="/dev/$device" '$1 ~ node {print $2;}' /proc/mounts`
+		for script in $(ls $service_dir); do (
+			[ -f $service_dir/$script ] && . $service_dir/$script umount /dev/$device "$mount_point"
+		); done
+
+		umount /dev/$device
+
+		echo "$mount_point" | grep -q -e '/mnt/' && { rm -rf "$( echo -e $mount_point)"; }
+		mount_point=$(dirname "$mount_point")
+		echo "$mount_point" | grep -q -e '/mnt/' && {
+			subdir=`find "$mount_point" -type d | wc -l`
+			[ "$subdir" -eq 1 ] && rm -rf "$mount_point"
+		}
+
+		;;
+    esac	
+

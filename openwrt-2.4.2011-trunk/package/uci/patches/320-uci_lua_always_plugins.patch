@@ -1,0 +1,11 @@
+diff -Naur uci-12012009.5-old/lua/uci.c uci-12012009.5-new/lua/uci.c
+--- uci-12012009.5-old/lua/uci.c	2010-03-23 07:38:00.000000000 -0700
++++ uci-12012009.5-new/lua/uci.c	2010-09-12 16:29:23.000000000 -0700
+@@ -882,6 +882,7 @@
+ 		default:
+ 			break;
+ 	}
++	uci_load_plugins(*u, NULL);
+ 	return 1;
+ }
+ 

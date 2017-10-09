@@ -1,0 +1,23 @@
+FLASH.RESET ;清掉之前的設定
+FLASH.CREATE 0xE8000000++0x20000 AM29N256 WORD
+
+;設定bootcode的範圍從0xE8000000 開始 128KB,也可以用 0xBFC00000--0xBFC40000
+;在flash 範圍之後是可以輸入sector size的,
+;但是GUI不讓我輸入 sector size. 奇怪,不過也好 這樣就不用去查sector的大小
+;接著是flash 的code name, 例如版子上是S29GL128P, 在TRACE32代號是 AM29N256.
+;代號可以在這網址查到http://www.lauterbach.com/frames.html?ylist.html
+;最後是 flash BUS 寬度 , 公版是16bits 所以是WORD, 如果是兩顆FLASH各是用16bits,
+;那BUS寬度就是32bits LONG.
+
+;3. Erase Flash.
+FLASH.ERASE ALL ; erase all flash chip.
+FLASH.ERASE 0xE8000000--0xE8020000 ; only erase bootloader 的位置
+
+;4. 開始燒錄
+FLASH.PROGRAM ALL ;燒錄預備
+DATA.LOAD.BINARY Q:\FPGA\g2-2.6.36\G2_0509_36\g2\openwrt-2.4.2011-trunk\target\linux\g2\u-boot-smp-wfi.bin 0xE8000000 /WORD
+;將bootcode 載入至flash address 0xE8000000 會match FLASH.CREATE 而trigger TRACE32將data寫入flash.
+;最後的 WORD 參數要match FLASH.CREATE 填的 bus width.
+FLASH.PROGRAM OFF ;取消燒錄
+
+print "Program Flash OK!"

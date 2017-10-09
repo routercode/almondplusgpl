@@ -1,0 +1,80 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2008-2010 OpenWrt.org
+
+. /etc/functions.sh
+
+START=90
+
+
+local lan_iface
+local wan_iface
+do_ipsec() {
+	local peesr_ipaddr
+	local peers_net
+	local dut_no
+	local lan_ipaddr
+	local wan_ipaddr
+	local psk
+	local auth_type
+	local enabled
+
+	config_get enabled $1 enabled 
+	config_get dut_no $1 dut_no 
+	config_get peers_ipaddr $1 peers_ipaddr 
+	config_get peers_net $1 peers_net
+	config_get psk $1 psk 
+	config_get auth_type $1 auth_type 
+
+	if [ "${enabled}" == "0" ]; then
+		echo "ipsec is not enabled!!!"
+		return
+	fi
+
+	[ -z "$dut_no" -o -z "$peers_ipaddr" -o -z "$peers_net" -z "$auth_type" ] && return
+
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+	echo 0 > /proc/driver/cs752x/ne/accel_manager/hw_accel_enable
+
+	echo ${psk} > /etc/racoon2/psk/test.psk
+	
+	mkdir -p -m 700 /var/run/racoon2
+	chmod 600 /etc/racoon2/spmd.pwd
+	chmod 600 -R /etc/racoon2/psk
+
+
+	wan_ipaddr=`ip addr show ${wan_iface} |  awk -v FS='[ /]+' '/inet / {print $3}'`
+	echo wan_ipaddr=${wan_ipaddr}
+
+	lan_ipaddr=`ip addr show ${lan_iface} |  awk '/inet / {print $2}'`
+	echo lan_ipaddr=${lan_ipaddr}
+	
+	sed -e "/MY_IPADDRESS[ \t]\+/s!.*!\tMY_IPADDRESS    \"${wan_ipaddr}\";!" -i /etc/racoon2/vals-dut${dut_no}-ipv4-ipv6.conf
+	
+	sed -e "/MY_NET[ \t]\+/s#.*#\tMY_NET    \"${lan_ipaddr}\";#" -i /etc/racoon2/vals-dut${dut_no}-ipv4-ipv6.conf
+	sed -e "/PEERS_IPADDRESS[ \t]\+/s#.*#\tPEERS_IPADDRESS    \"${peers_ipaddr}\";#" -i /etc/racoon2/vals-dut${dut_no}-ipv4-ipv6.conf
+	sed -e "/PEERS_NET[ \t]\+/s#.*#\tPEERS_NET    \"${peers_net}\";#" -i /etc/racoon2/vals-dut${dut_no}-ipv4-ipv6.conf
+
+	echo "spmd -f /etc/racoon2/racoon2-dut${dut_no}-ipv4-ipv6-${auth_type}.conf"
+	spmd -f /etc/racoon2/racoon2-dut${dut_no}-ipv4-ipv6-${auth_type}.conf	
+	sleep 3
+	iked -f /etc/racoon2/racoon2-dut${dut_no}-ipv4-ipv6-${auth_type}.conf	
+}
+
+do_network() {
+	config_get wan_iface wan ifname
+	config_get lan_iface lan ifname
+	echo wan_iface=${wan_iface}	
+	echo lan_iface=${lan_iface}	
+}
+
+start() {
+	config_load network
+	config_foreach do_network interface 	
+	config_load ipsec 
+	config_foreach do_ipsec ipsec 
+}
+
+stop() {
+	killall spmd 
+	ip xfrm state deleteall
+}

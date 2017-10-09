@@ -1,0 +1,11 @@
+--- uci-2011-01-19.1/Makefile.inc.orig	2013-03-18 16:05:35.506938651 -0700
++++ uci-2011-01-19.1/Makefile.inc	2013-03-18 16:05:59.010939535 -0700
+@@ -3,7 +3,7 @@
+ LIBDIRNAME=lib
+ 
+ COPTS=-O2
+-WOPTS=-pedantic -Werror -Wall
++WOPTS=-pedantic
+ FPIC=-fPIC
+ CFLAGS=$(COPTS) $(WOPTS) -std=gnu99
+ CPPFLAGS=-I.

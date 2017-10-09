@@ -1,0 +1,38 @@
+setenv ethaddr $ethaddr
+setenv ethaddr1 $ethaddr1
+setenv ethaddr2 $ethaddr2
+setenv wifiaddr0 $wifiaddr0
+setenv wifiaddr1 $wifiaddr1
+setenv ipaddr $ipaddr
+setenv netmask $netmask
+setenv serverip $serverip
+setenv gatewayip $gatewayip
+setenv stdin serial
+setenv stdout serial
+setenv stderr serial
+setenv verify n
+setenv ethact goldengate
+setenv basicargs $basic_args $more_args 
+setenv setbootargs setenv bootargs ${basicargs} ${ramargs} ni_napi_budget=${NI_NAPI_BUDGET} qm_acp_enable=${QM_ACP_ENABLE} ni_rx_noncache=${NI_RX_NONCACHE} qm_int_buff=${QM_INT_BUFF} ethaddr0=${ethaddr} ethaddr1=${ethaddr1} ethaddr2=${ethaddr2} wifiaddr0=${wifiaddr0} wifiaddr1=${wifiaddr1} mtdparts=$flash_name:${mtdparts}$mtd_args
+setenv kernel_address $kernel_ram_cp
+setenv rootfs_address $rootfs_ram_cp
+setenv sb0_address $sb0_addr
+setenv sb1_address $sb1_addr
+setenv process sb_process ${kernel_address} ${rootfs_address} ${sb0_address} ${sb1_address}
+setenv b bootm ${kernel_address} ${rootfs_address}
+setenv bootcmd run process setbootargs b
+setenv bootdelay 5
+setenv flashfiles nand/
+setenv reflash run rf_info rf_loader rf_env rf_sb0 rf_sb1 rf_uimage rf_rootfs rf_overlay
+setenv rf_info tftpboot 0x5000000 ${flashfiles}nand-info.bin; nand erase 0x00000000 0x00020000; nand write 0x5000000 0x00000000 0x00020000 
+setenv rf_loader tftpboot 0x5000000 ${flashfiles}bootloader.bin; nand erase 0x00020000 0x000e0000; nand write 0x5000000 0x00020000 0x00040000; nand erase 0x00200000 0x00100000; nand write 0x5000000 0x00200000 0x00040000 
+setenv rf_env tftpboot 0x5000000 ${flashfiles}uboot-env.bin; nand erase 0x00100000 0x100000; nand write 0x5000000 0x00100000 0x00020000 ; nand erase 0x00300000 0x100000; nand write 0x5000000 0x00300000 0x00020000 
+setenv rf_sb0 tftpboot 0x5000000 ${flashfiles}sb0.bin; nand erase 0x00400000 0x100000; nand write 0x5000000 0x00400000 0x00020000 
+setenv rf_sb1 tftpboot 0x5000000 ${flashfiles}sb1.bin; nand erase 0x00500000 0x100000; nand write 0x5000000 0x00500000 0x00020000 
+setenv rf_uimage tftpboot 0x5000000 ${flashfiles}uImage; nand erase 0x00600000 0x00600000 ; nand write 0x5000000 0x00600000 0x00500000; nand erase 0x03A00000 0x00600000; nand write 0x5000000 0x03A00000 0x00500000
+setenv rf_rootfs tftpboot 0x5000000 ${flashfiles}rootfs.img; nand erase 0x00C00000 0x02E00000 ; nand write 0x5000000 0x00C00000 0x02D00000 ; nand erase 0x04000000 0x02E00000; nand write 0x5000000 0x04000000 0x02D00000
+setenv rf_overlay nand erase 0x6E00000 0x01000000
+setenv QM_INT_BUFF $qm_init_buff
+setenv NI_NAPI_BUDGET $ni_napi_budget
+setenv QM_ACP_ENABLE $qm_acp_enable
+setenv NI_RX_NONCACHE $ni_rx_noncache 
